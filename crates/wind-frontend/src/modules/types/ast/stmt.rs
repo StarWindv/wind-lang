@@ -39,6 +39,7 @@ pub enum WindStmt {
     },
     Return(Option<Box<WindExpr>>),
     FnDef {
+        public: bool,
         name: String,
         params: Vec<WindFnParam>,
         return_type: Option<WindType>,
@@ -46,33 +47,40 @@ pub enum WindStmt {
         body: Box<WindStmt>,
     },
     StructDef {
+        public: bool,
         name: String,
         fields: Vec<WindStructField>,
     },
     EnumDef {
+        public: bool,
         name: String,
         variants: Vec<(String, Option<WindType>)>,
     },
     TypeDef {
+        public: bool,
         name: String,
         base_type: WindType,
         conditions: Vec<WindExpr>,
     },
     ExtraDef {
+        public: bool,
         name: Option<String>,
         target: String,
         functions: Vec<WindStmt>,
     },
     ImplDef {
+        public: bool,
         trait_name: String,
         target: String,
         functions: Vec<WindStmt>,
     },
     TraitDef {
+        public: bool,
         name: String,
         functions: Vec<WindFnSignature>,
     },
     GroupDef {
+        public: bool,
         name: String,
         target: Option<String>,
         params: Option<Vec<WindFnParam>>,

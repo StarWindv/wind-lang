@@ -953,7 +953,6 @@ dependencies = [
  "chumsky",
  "log",
  "logos",
- "thiserror",
 ]
 
 [[package]]
