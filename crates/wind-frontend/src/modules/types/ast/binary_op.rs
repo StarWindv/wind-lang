@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq)]
-pub enum BinaryOp {
+pub enum WindBinaryOp {
     Add,
     Sub,
     Mul,

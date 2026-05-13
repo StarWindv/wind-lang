@@ -1,10 +1,9 @@
-use crate::modules::implements::tokens::Span;
-use crate::modules::types::tokens::Token;
+use crate::modules::types::tokens::{WindSpan, WindToken};
 
 #[derive(Debug, Clone)]
-pub struct ParseError {
+pub struct WindParseError {
     pub message: String,
-    pub span: Span,
-    pub found: Option<Token>,
+    pub span: WindSpan,
+    pub found: Option<WindToken>,
     pub expected: Vec<String>,
 }

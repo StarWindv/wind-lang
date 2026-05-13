@@ -1,11 +1,17 @@
 use logos::Logos;
 
+
+pub type WindSpan = std::ops::Range<usize>;
+
+pub type WindSpannedToken = (WindToken, WindSpan);
+
+
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Hash)]
 #[logos(
     skip r"[ \t\n\r\f]+",
     skip r"```[\s\S]*?```"
 )]
-pub enum Token {
+pub enum WindToken {
     #[token("fn")]
     Fn,
     #[token("struct")]

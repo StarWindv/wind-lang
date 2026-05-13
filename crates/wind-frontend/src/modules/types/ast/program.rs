@@ -1,6 +1,6 @@
-use super::stmt::Stmt;
+use super::stmt::WindStmt;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Program {
-    pub items: Vec<Stmt>,
+pub struct WindProgram {
+    pub items: Vec<WindStmt>,
 }

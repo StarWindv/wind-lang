@@ -1,30 +1,30 @@
-use crate::modules::types::ast::BinaryOp;
-use crate::modules::types::tokens::Token;
+use crate::modules::types::ast::WindBinaryOp;
+use crate::modules::types::tokens::WindToken;
 
-impl BinaryOp {
-    pub fn from_token(tok: &Token) -> Option<Self> {
+impl WindBinaryOp {
+    pub fn from_token(tok: &WindToken) -> Option<Self> {
         match tok {
-            Token::Plus => Some(BinaryOp::Add),
-            Token::Minus => Some(BinaryOp::Sub),
-            Token::Star => Some(BinaryOp::Mul),
-            Token::Slash => Some(BinaryOp::Div),
-            Token::DoubleSlash => Some(BinaryOp::IntDiv),
-            Token::Percent => Some(BinaryOp::Mod),
-            Token::AndAnd => Some(BinaryOp::And),
-            Token::OrOr => Some(BinaryOp::Or),
-            Token::Amp => Some(BinaryOp::BitAnd),
-            Token::Pipe => Some(BinaryOp::BitOr),
-            Token::Caret => Some(BinaryOp::BitXor),
-            Token::LeftShift => Some(BinaryOp::Shl),
-            Token::RightShift => Some(BinaryOp::Shr),
-            Token::EqualEqual => Some(BinaryOp::Eq),
-            Token::NotEqual => Some(BinaryOp::Neq),
-            Token::Less => Some(BinaryOp::Lt),
-            Token::Greater => Some(BinaryOp::Gt),
-            Token::LessEqual => Some(BinaryOp::Le),
-            Token::GreaterEqual => Some(BinaryOp::Ge),
-            Token::NotLess => Some(BinaryOp::NotLt),
-            Token::NotGreater => Some(BinaryOp::NotGt),
+            WindToken::Plus => Some(WindBinaryOp::Add),
+            WindToken::Minus => Some(WindBinaryOp::Sub),
+            WindToken::Star => Some(WindBinaryOp::Mul),
+            WindToken::Slash => Some(WindBinaryOp::Div),
+            WindToken::DoubleSlash => Some(WindBinaryOp::IntDiv),
+            WindToken::Percent => Some(WindBinaryOp::Mod),
+            WindToken::AndAnd => Some(WindBinaryOp::And),
+            WindToken::OrOr => Some(WindBinaryOp::Or),
+            WindToken::Amp => Some(WindBinaryOp::BitAnd),
+            WindToken::Pipe => Some(WindBinaryOp::BitOr),
+            WindToken::Caret => Some(WindBinaryOp::BitXor),
+            WindToken::LeftShift => Some(WindBinaryOp::Shl),
+            WindToken::RightShift => Some(WindBinaryOp::Shr),
+            WindToken::EqualEqual => Some(WindBinaryOp::Eq),
+            WindToken::NotEqual => Some(WindBinaryOp::Neq),
+            WindToken::Less => Some(WindBinaryOp::Lt),
+            WindToken::Greater => Some(WindBinaryOp::Gt),
+            WindToken::LessEqual => Some(WindBinaryOp::Le),
+            WindToken::GreaterEqual => Some(WindBinaryOp::Ge),
+            WindToken::NotLess => Some(WindBinaryOp::NotLt),
+            WindToken::NotGreater => Some(WindBinaryOp::NotGt),
             _ => None,
         }
     }

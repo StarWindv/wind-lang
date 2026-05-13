@@ -1,11 +1,11 @@
-use crate::modules::types::ast::UnaryOp;
-use crate::modules::types::tokens::Token;
+use crate::modules::types::ast::WindUnaryOp;
+use crate::modules::types::tokens::WindToken;
 
-impl UnaryOp {
-    pub fn from_token(tok: &Token) -> Option<Self> {
+impl WindUnaryOp {
+    pub fn from_token(tok: &WindToken) -> Option<Self> {
         match tok {
-            Token::Minus => Some(UnaryOp::Neg),
-            Token::Bang => Some(UnaryOp::Not),
+            WindToken::Minus => Some(WindUnaryOp::Neg),
+            WindToken::Bang => Some(WindUnaryOp::Not),
             _ => None,
         }
     }

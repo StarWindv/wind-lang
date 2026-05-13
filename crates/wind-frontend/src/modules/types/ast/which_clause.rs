@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq)]
-pub struct WhichClause {
+pub struct WindWhichClause {
     pub method: String,
     pub after: Vec<String>,
 }

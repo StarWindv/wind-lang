@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq)]
-pub enum AssignOp {
+pub enum WindAssignOp {
     Direct,
     LeftAbs,
     RightAbs,

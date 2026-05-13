@@ -1,10 +1,10 @@
-use super::binary_op::BinaryOp;
-use super::unary_op::UnaryOp;
-use super::ty::Type;
-use super::stmt::Stmt;
+use super::binary_op::WindBinaryOp;
+use super::unary_op::WindUnaryOp;
+use super::ty::WindType;
+use super::stmt::WindStmt;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
+pub enum WindExpr {
     IntLiteral(i64),
     FloatLiteral(f64),
     StringLiteral(String),
@@ -13,44 +13,44 @@ pub enum Expr {
     NoneLiteral,
     Identifier(String),
     Binary {
-        left: Box<Expr>,
-        op: BinaryOp,
-        right: Box<Expr>,
+        left: Box<WindExpr>,
+        op: WindBinaryOp,
+        right: Box<WindExpr>,
     },
     Unary {
-        op: UnaryOp,
-        expr: Box<Expr>,
+        op: WindUnaryOp,
+        expr: Box<WindExpr>,
     },
     Call {
-        callee: Box<Expr>,
-        args: Vec<Expr>,
+        callee: Box<WindExpr>,
+        args: Vec<WindExpr>,
     },
     FieldAccess {
-        object: Box<Expr>,
+        object: Box<WindExpr>,
         field: String,
     },
     Index {
-        expr: Box<Expr>,
-        index: Box<Expr>,
+        expr: Box<WindExpr>,
+        index: Box<WindExpr>,
     },
     ScopeRef {
-        object: Box<Expr>,
+        object: Box<WindExpr>,
         member: String,
     },
     TypeExpr {
-        expr: Box<Expr>,
-        ty: Type,
+        expr: Box<WindExpr>,
+        ty: WindType,
     },
-    Group(Box<Expr>),
-    MapLiteral(Vec<(Expr, Expr)>),
-    ArrayLiteral(Vec<Expr>),
+    Group(Box<WindExpr>),
+    MapLiteral(Vec<(WindExpr, WindExpr)>),
+    ArrayLiteral(Vec<WindExpr>),
     IfExpr {
-        condition: Box<Expr>,
-        then_branch: Box<Expr>,
-        else_branch: Option<Box<Expr>>,
+        condition: Box<WindExpr>,
+        then_branch: Box<WindExpr>,
+        else_branch: Option<Box<WindExpr>>,
     },
     TagExpr {
         name: String,
-        body: Vec<Stmt>,
+        body: Vec<WindStmt>,
     },
 }

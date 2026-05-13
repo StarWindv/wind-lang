@@ -1,13 +1,13 @@
-use super::ty::Type;
+use super::ty::WindType;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum GroupRule {
+pub enum WindGroupRule {
     Simple {
         field: String,
-        ty: Type,
+        ty: WindType,
     },
     SelfField {
         field: String,
-        ty: Type,
+        ty: WindType,
     },
 }

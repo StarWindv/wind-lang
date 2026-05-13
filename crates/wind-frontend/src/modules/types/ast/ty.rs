@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, PartialEq)]
-pub enum Type {
+pub enum WindType {
     Named(String),
     Fn {
-        params: Vec<Type>,
-        ret: Box<Type>,
+        params: Vec<WindType>,
+        ret: Box<WindType>,
     },
 }

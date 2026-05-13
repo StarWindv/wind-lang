@@ -1,7 +1,7 @@
-use super::ty::Type;
+use super::ty::WindType;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FnParam {
+pub struct WindFnParam {
     pub name: String,
-    pub ty: Option<Type>,
+    pub ty: Option<WindType>,
 }

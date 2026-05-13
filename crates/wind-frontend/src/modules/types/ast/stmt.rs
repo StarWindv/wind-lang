@@ -1,88 +1,88 @@
-use super::expr::Expr;
-use super::assign_op::AssignOp;
-use super::ty::Type;
-use super::fn_param::FnParam;
-use super::struct_field::StructField;
-use super::fn_signature::FnSignature;
-use super::group_rule::GroupRule;
+use super::expr::WindExpr;
+use super::assign_op::WindAssignOp;
+use super::ty::WindType;
+use super::fn_param::WindFnParam;
+use super::struct_field::WindStructField;
+use super::fn_signature::WindFnSignature;
+use super::group_rule::WindGroupRule;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Stmt {
+pub enum WindStmt {
     Let {
         name: String,
-        ty: Option<Type>,
-        value: Box<Expr>,
+        ty: Option<WindType>,
+        value: Box<WindExpr>,
     },
     Assignment {
-        target: Box<Expr>,
-        op: AssignOp,
-        value: Box<Expr>,
+        target: Box<WindExpr>,
+        op: WindAssignOp,
+        value: Box<WindExpr>,
     },
-    Expr(Box<Expr>),
-    Block(Vec<Stmt>),
+    Expr(Box<WindExpr>),
+    Block(Vec<WindStmt>),
     If {
-        condition: Box<Expr>,
-        then_branch: Box<Stmt>,
-        elif_branches: Vec<(Expr, Stmt)>,
-        else_branch: Option<Box<Stmt>>,
+        condition: Box<WindExpr>,
+        then_branch: Box<WindStmt>,
+        elif_branches: Vec<(WindExpr, WindStmt)>,
+        else_branch: Option<Box<WindStmt>>,
     },
     For {
-        init: Option<Box<Expr>>,
-        condition: Option<Box<Expr>>,
-        update: Option<Box<Expr>>,
-        body: Box<Stmt>,
+        init: Option<Box<WindExpr>>,
+        condition: Option<Box<WindExpr>>,
+        update: Option<Box<WindExpr>>,
+        body: Box<WindStmt>,
     },
     While {
-        condition: Box<Expr>,
-        body: Box<Stmt>,
+        condition: Box<WindExpr>,
+        body: Box<WindStmt>,
     },
-    Return(Option<Box<Expr>>),
+    Return(Option<Box<WindExpr>>),
     FnDef {
         name: String,
-        params: Vec<FnParam>,
-        return_type: Option<Type>,
-        body: Box<Stmt>,
+        params: Vec<WindFnParam>,
+        return_type: Option<WindType>,
+        body: Box<WindStmt>,
     },
     StructDef {
         name: String,
-        fields: Vec<StructField>,
+        fields: Vec<WindStructField>,
     },
     EnumDef {
         name: String,
-        variants: Vec<(String, Option<Type>)>,
+        variants: Vec<(String, Option<WindType>)>,
     },
     TypeDef {
         name: String,
-        base_type: Type,
-        conditions: Vec<Expr>,
+        base_type: WindType,
+        conditions: Vec<WindExpr>,
     },
     ExtraDef {
         name: String,
         target: String,
-        functions: Vec<Stmt>,
+        functions: Vec<WindStmt>,
     },
     ImplDef {
         trait_name: String,
         target: String,
-        functions: Vec<Stmt>,
+        functions: Vec<WindStmt>,
     },
     TraitDef {
         name: String,
-        functions: Vec<FnSignature>,
+        functions: Vec<WindFnSignature>,
     },
     GroupDef {
         name: String,
         target: Option<String>,
-        params: Option<Vec<FnParam>>,
-        rules: Vec<GroupRule>,
+        params: Option<Vec<WindFnParam>>,
+        rules: Vec<WindGroupRule>,
     },
     ConstDef {
         name: String,
-        value: Box<Expr>,
+        value: Box<WindExpr>,
     },
     ConstaticDef {
         name: String,
-        value: Box<Expr>,
+        value: Box<WindExpr>,
     },
     ToStmt {
         tag: String,

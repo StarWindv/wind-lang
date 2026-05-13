@@ -1,12 +1,12 @@
-use super::fn_param::FnParam;
-use super::ty::Type;
-use super::which_clause::WhichClause;
+use super::fn_param::WindFnParam;
+use super::ty::WindType;
+use super::which_clause::WindWhichClause;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FnSignature {
+pub struct WindFnSignature {
     pub public: bool,
     pub name: String,
-    pub params: Vec<FnParam>,
-    pub return_type: Option<Type>,
-    pub which: Option<Vec<WhichClause>>,
+    pub params: Vec<WindFnParam>,
+    pub return_type: Option<WindType>,
+    pub which: Option<Vec<WindWhichClause>>,
 }

@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq)]
-pub enum UnaryOp {
+pub enum WindUnaryOp {
     Neg,
     Not,
 }
