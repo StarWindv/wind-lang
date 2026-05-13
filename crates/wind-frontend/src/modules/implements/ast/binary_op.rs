@@ -25,6 +25,7 @@ impl WindBinaryOp {
             WindToken::GreaterEqual => Some(WindBinaryOp::Ge),
             WindToken::NotLess => Some(WindBinaryOp::NotLt),
             WindToken::NotGreater => Some(WindBinaryOp::NotGt),
+            WindToken::In => Some(WindBinaryOp::In),
             _ => None,
         }
     }

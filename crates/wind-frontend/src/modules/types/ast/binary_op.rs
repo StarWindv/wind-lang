@@ -21,4 +21,5 @@ pub enum WindBinaryOp {
     Ge,
     NotLt,
     NotGt,
+    In,
 }

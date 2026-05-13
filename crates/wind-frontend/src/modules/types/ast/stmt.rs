@@ -5,6 +5,7 @@ use super::fn_param::WindFnParam;
 use super::struct_field::WindStructField;
 use super::fn_signature::WindFnSignature;
 use super::group_rule::WindGroupRule;
+use super::which_clause::WindWhichClause;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum WindStmt {
@@ -41,6 +42,7 @@ pub enum WindStmt {
         name: String,
         params: Vec<WindFnParam>,
         return_type: Option<WindType>,
+        which: Option<Vec<WindWhichClause>>,
         body: Box<WindStmt>,
     },
     StructDef {
@@ -57,7 +59,7 @@ pub enum WindStmt {
         conditions: Vec<WindExpr>,
     },
     ExtraDef {
-        name: String,
+        name: Option<String>,
         target: String,
         functions: Vec<WindStmt>,
     },
@@ -86,5 +88,10 @@ pub enum WindStmt {
     },
     ToStmt {
         tag: String,
+    },
+    Apply {
+        group: String,
+        target: String,
+        fields: Vec<String>,
     },
 }
