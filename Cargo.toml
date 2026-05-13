@@ -1,0 +1,16 @@
+[workspace]
+members = ["crates/wind","crates/wind-frontend", "crates/wind-test"]
+resolver = "3"
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "GPL-3.0-only"
+rust-version = "1.95.0"
+homepage = "https://github.com/starwindv/"
+description = "Wind 是一个实验性语言, 仅用于验证理念"
+
+[workspace.dependencies]
+log = "0.4.29"
+log4rs = "1.4.0"
+thiserror = "2.0.18"
