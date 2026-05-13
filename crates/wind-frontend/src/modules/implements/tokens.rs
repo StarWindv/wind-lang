@@ -58,7 +58,8 @@ impl WindToken {
                 }
                 Err(()) => {
                     let sliced = &source[span.clone()];
-                    let msg = format!("词法错误: 无法识别的字符序列 `{sliced}` @ {span:?}");
+                    let (line, col) = crate::modules::types::tokens::byte_to_line_col(source, span.start);
+                    let msg = format!("词法错误 [{line}:{col}]: 无法识别的字符序列 `{sliced}`");
                     log::error!("{msg}");
                     errors.push(LexError {
                         message: msg,

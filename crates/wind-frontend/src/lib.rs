@@ -6,7 +6,8 @@ pub mod lexer {
     pub use modules::types::tokens::{
         WindSpan,
         WindSpannedToken,
-        WindToken
+        WindToken,
+        byte_to_line_col,
     };
 }
 

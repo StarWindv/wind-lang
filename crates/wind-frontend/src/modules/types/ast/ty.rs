@@ -9,4 +9,5 @@ pub enum WindType {
         params: Vec<WindType>,
         ret: Box<WindType>,
     },
+    SelfType,
 }

@@ -88,10 +88,12 @@ pub enum WindStmt {
     },
     ConstDef {
         name: String,
+        ty: WindType,
         value: Box<WindExpr>,
     },
     ConstaticDef {
         name: String,
+        ty: WindType,
         value: Box<WindExpr>,
     },
     ToStmt {
@@ -101,5 +103,15 @@ pub enum WindStmt {
         group: String,
         target: String,
         fields: Vec<String>,
+    },
+    ExplainDef {
+        name: String,
+        ty: WindType,
+        value: Box<WindExpr>,
+    },
+    ForIn {
+        var: String,
+        iterable: Box<WindExpr>,
+        body: Box<WindStmt>,
     },
 }

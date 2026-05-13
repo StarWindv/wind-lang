@@ -5,10 +5,19 @@ pub type WindSpan = std::ops::Range<usize>;
 
 pub type WindSpannedToken = (WindToken, WindSpan);
 
+pub fn byte_to_line_col(source: &str, offset: usize) -> (usize, usize) {
+    let offset = offset.min(source.len());
+    let line = source[..offset].matches('\n').count() + 1;
+    let last_nl = source[..offset].rfind('\n').map(|p| p + 1).unwrap_or(0);
+    let col = offset - last_nl + 1;
+    (line, col)
+}
+
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Hash)]
 #[logos(
     skip r"[ \t\n\r\f]+",
+    skip r"\\[ \t]*\n",
     skip r"```[\s\S]*?```"
 )]
 pub enum WindToken {
@@ -58,6 +67,10 @@ pub enum WindToken {
     To,
     #[token("tag")]
     Tag,
+    #[token("explain")]
+    Explain,
+    #[token("static")]
+    Static,
     #[token("self")]
     SelfKw,
     #[token("this")]
@@ -71,6 +84,25 @@ pub enum WindToken {
     #[token("None")]
     NoneKw,
 
+    #[token("lambda")]
+    Lambda,
+    #[token("from")]
+    From,
+    #[token("import")]
+    Import,
+    #[token("use")]
+    Use,
+    #[token("as")]
+    As,
+    #[token("when")]
+    When,
+    #[token("define")]
+    Define,
+    #[token("guard")]
+    Guard,
+    #[token("protect")]
+    Protect,
+
     #[token("<=")]
     LessEqual,
     #[token(">=")]
@@ -83,6 +115,8 @@ pub enum WindToken {
     NotGreater,
     #[token("==")]
     EqualEqual,
+    #[token("===")]
+    AddrEqual,
     #[token("<:")]
     LeftAssign,
     #[token(":>")]
@@ -101,6 +135,20 @@ pub enum WindToken {
     AndAnd,
     #[token("||")]
     OrOr,
+    #[token("+=")]
+    PlusEqual,
+    #[token("-=")]
+    MinusEqual,
+    #[token("*=")]
+    StarEqual,
+    #[token("/=")]
+    SlashEqual,
+    #[token("++")]
+    PlusPlus,
+    #[token("--")]
+    MinusMinus,
+    #[token("..")]
+    DotDot,
 
     #[token(".")]
     Dot,
@@ -153,7 +201,7 @@ pub enum WindToken {
     FloatLiteral(String),
     #[regex(r"[0-9]+", |lex| lex.slice().parse::<i64>().unwrap())]
     IntLiteral(i64),
-    #[regex(r#""([^"\\]|\\[^"])*""#, |lex| {
+    #[regex(r#""([^"\\]|\\"|\\[^"])*""#, |lex| {
         let s = lex.slice();
         s[1..s.len()-1].to_string()
     })]

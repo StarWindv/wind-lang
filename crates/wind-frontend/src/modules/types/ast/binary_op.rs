@@ -14,6 +14,7 @@ pub enum WindBinaryOp {
     Shl,
     Shr,
     Eq,
+    AddrEq,
     Neq,
     Lt,
     Gt,

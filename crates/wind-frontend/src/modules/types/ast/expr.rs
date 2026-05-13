@@ -53,4 +53,9 @@ pub enum WindExpr {
         name: String,
         body: Vec<WindStmt>,
     },
+    Unpack(Box<WindExpr>),
+    StructLiteral {
+        name: String,
+        fields: Vec<(String, WindExpr)>,
+    },
 }

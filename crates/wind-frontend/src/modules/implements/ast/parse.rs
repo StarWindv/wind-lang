@@ -98,15 +98,22 @@ impl WindParser {
                 .ignore_then(type_rec.clone().separated_by(Self::select_token(WindToken::Comma)).collect())
                 .then_ignore(Self::select_token(WindToken::Greater));
 
-            Self::identifier()
-                .then(generic_args.or_not())
-                .map(|(base, args)| {
-                    if let Some(args) = args {
-                        WindType::Generic { base, args }
-                    } else {
-                        WindType::Named(base)
-                    }
-                })
+            let self_type = Self::select_token(WindToken::SelfKw).to(WindType::SelfType);
+            let none_type = Self::select_token(WindToken::NoneKw).to(WindType::Named("None".to_string()));
+
+            choice((
+                self_type,
+                none_type,
+                Self::identifier()
+                    .then(generic_args.or_not())
+                    .map(|(base, args)| {
+                        if let Some(args) = args {
+                            WindType::Generic { base, args }
+                        } else {
+                            WindType::Named(base)
+                        }
+                    }),
+            ))
         })
     }
 
@@ -119,7 +126,14 @@ impl WindParser {
     fn fn_param<'a, I>() -> impl Parser<'a, I, WindFnParam, WindRichErr<'a>> + Clone
     where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
     {
-        Self::identifier().then(Self::type_annotation().or_not()).map(|(name, ty)| WindFnParam { name, ty })
+        let self_param = Self::self_keyword().map(|e| {
+            let name = if let WindExpr::Identifier(n) = e { n } else { String::new() };
+            WindFnParam { name, ty: None }
+        });
+        let normal_param = Self::identifier().then(Self::type_annotation().or_not())
+            .map(|(name, ty)| WindFnParam { name, ty });
+
+        choice((self_param, normal_param))
     }
 
     fn assign_op<'a, I>() -> impl Parser<'a, I, WindAssignOp, WindRichErr<'a>> + Clone
@@ -128,6 +142,10 @@ impl WindParser {
         choice((
             Self::select_token(WindToken::LeftAssign).to(WindAssignOp::LeftAbs),
             Self::select_token(WindToken::RightAssign).to(WindAssignOp::RightAbs),
+            Self::select_token(WindToken::PlusEqual).to(WindAssignOp::SumEq),
+            Self::select_token(WindToken::MinusEqual).to(WindAssignOp::DiffEq),
+            Self::select_token(WindToken::StarEqual).to(WindAssignOp::ProdEq),
+            Self::select_token(WindToken::SlashEqual).to(WindAssignOp::QuotEq),
             Self::select_token(WindToken::Equal).to(WindAssignOp::Direct),
         ))
     }
@@ -192,23 +210,52 @@ impl WindParser {
             let map_literal = {
                 let pair = full_expr.clone().then_ignore(Self::select_token(WindToken::Colon)).then(full_expr.clone());
                 Self::select_token(WindToken::OpenBrace)
-                    .ignore_then(pair.separated_by(Self::select_token(WindToken::Comma)).collect())
+                    .ignore_then(pair.separated_by(Self::select_token(WindToken::Comma)).allow_trailing().collect())
                     .then_ignore(Self::select_token(WindToken::CloseBrace))
                     .map(WindExpr::MapLiteral)
             };
 
             let array_literal = Self::select_token(WindToken::OpenBracket)
-                .ignore_then(full_expr.clone().separated_by(Self::select_token(WindToken::Comma)).collect())
+                .ignore_then(full_expr.clone().separated_by(Self::select_token(WindToken::Comma)).allow_trailing().collect())
                 .then_ignore(Self::select_token(WindToken::CloseBracket))
                 .map(WindExpr::ArrayLiteral);
 
+            let struct_literal = {
+                let explicit_field = Self::identifier()
+                    .then_ignore(Self::select_token(WindToken::Colon))
+                    .then(full_expr.clone())
+                    .map(|(name, val)| (name, val));
+                let shorthand_or_expr = full_expr.clone()
+                    .map(|expr| {
+                        if let WindExpr::Identifier(ref name) = expr {
+                            (name.clone(), expr)
+                        } else {
+                            (String::new(), expr)
+                        }
+                    });
+                let field = choice((explicit_field, shorthand_or_expr));
+                Self::ident_expr()
+                    .then(
+                        Self::select_token(WindToken::OpenBrace)
+                            .ignore_then(field.separated_by(Self::select_token(WindToken::Comma)).allow_trailing().collect())
+                            .then_ignore(Self::select_token(WindToken::CloseBrace))
+                    )
+                    .map(|(name, fields)| {
+                        if let WindExpr::Identifier(n) = name {
+                            WindExpr::StructLiteral { name: n, fields }
+                        } else {
+                            WindExpr::MapLiteral(fields.into_iter().map(|(k, v)| (WindExpr::Identifier(k), v)).collect())
+                        }
+                    })
+            };
+
             let atom = choice((
-                literal, group, if_expr, map_literal, array_literal,
+                literal, group, if_expr, map_literal, array_literal, struct_literal,
                 Self::self_keyword(), Self::ident_expr(),
             ));
 
             let call_args = Self::select_token(WindToken::OpenParen)
-                .ignore_then(full_expr.clone().separated_by(Self::select_token(WindToken::Comma)).collect())
+                .ignore_then(full_expr.clone().separated_by(Self::select_token(WindToken::Comma)).allow_trailing().collect())
                 .then_ignore(Self::select_token(WindToken::CloseParen));
 
             let postfix_pref_infix_lo = (
@@ -227,11 +274,11 @@ impl WindParser {
                         .then_ignore(Self::select_token(WindToken::CloseBracket)),
                     |lhs, idx, _span| WindExpr::Index { expr: Box::new(lhs), index: Box::new(idx) },
                 ),
-                pratt::prefix(11, Self::select_token(WindToken::Minus).to(WindUnaryOp::Neg), |_op, rhs, _span| {
-                    WindExpr::Unary { op: WindUnaryOp::Neg, expr: Box::new(rhs) }
+                pratt::postfix(13, Self::select_token(WindToken::PlusPlus), |lhs, _op, _span| {
+                    WindExpr::Unary { op: WindUnaryOp::IncPost, expr: Box::new(lhs) }
                 }),
-                pratt::prefix(11, Self::select_token(WindToken::Bang).to(WindUnaryOp::Not), |_op, rhs, _span| {
-                    WindExpr::Unary { op: WindUnaryOp::Not, expr: Box::new(rhs) }
+                pratt::postfix(13, Self::select_token(WindToken::MinusMinus), |lhs, _op, _span| {
+                    WindExpr::Unary { op: WindUnaryOp::DecPost, expr: Box::new(lhs) }
                 }),
                 pratt::infix(pratt::left(10), Self::select_token(WindToken::Star).to(WindBinaryOp::Mul), |l, op, r, _| {
                     WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
@@ -251,6 +298,27 @@ impl WindParser {
                 pratt::infix(pratt::left(9), Self::select_token(WindToken::Minus).to(WindBinaryOp::Sub), |l, op, r, _| {
                     WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
                 }),
+            );
+
+            let prefix_lo = (
+                pratt::prefix(11, Self::select_token(WindToken::PlusPlus).to(WindUnaryOp::Inc), |_op, rhs, _span| {
+                    WindExpr::Unary { op: WindUnaryOp::Inc, expr: Box::new(rhs) }
+                }),
+                pratt::prefix(11, Self::select_token(WindToken::MinusMinus).to(WindUnaryOp::Dec), |_op, rhs, _span| {
+                    WindExpr::Unary { op: WindUnaryOp::Dec, expr: Box::new(rhs) }
+                }),
+                pratt::prefix(11, Self::select_token(WindToken::Minus).to(WindUnaryOp::Neg), |_op, rhs, _span| {
+                    WindExpr::Unary { op: WindUnaryOp::Neg, expr: Box::new(rhs) }
+                }),
+                pratt::prefix(11, Self::select_token(WindToken::Bang).to(WindUnaryOp::Not), |_op, rhs, _span| {
+                    WindExpr::Unary { op: WindUnaryOp::Not, expr: Box::new(rhs) }
+                }),
+                pratt::prefix(11, Self::select_token(WindToken::DotDot), |_op, rhs, _span| {
+                    WindExpr::Unpack(Box::new(rhs))
+                }),
+            );
+
+            let infix_lo = (
                 pratt::infix(pratt::left(8), Self::select_token(WindToken::LeftShift).to(WindBinaryOp::Shl), |l, op, r, _| {
                     WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
                 }),
@@ -281,6 +349,9 @@ impl WindParser {
                 pratt::infix(pratt::left(6), Self::select_token(WindToken::EqualEqual).to(WindBinaryOp::Eq), |l, op, r, _| {
                     WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
                 }),
+                pratt::infix(pratt::left(6), Self::select_token(WindToken::AddrEqual).to(WindBinaryOp::AddrEq), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
                 pratt::infix(pratt::left(6), Self::select_token(WindToken::NotEqual).to(WindBinaryOp::Neq), |l, op, r, _| {
                     WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
                 }),
@@ -304,7 +375,7 @@ impl WindParser {
                 }),
             );
 
-            atom.pratt(postfix_pref_infix_lo).pratt(infix_hi)
+            atom.pratt(postfix_pref_infix_lo).pratt(prefix_lo).pratt(infix_lo).pratt(infix_hi)
         })
     }
 
@@ -333,14 +404,14 @@ impl WindParser {
 
             let let_stmt = Self::identifier().then(Self::type_annotation().or_not())
                 .then(Self::select_token(WindToken::Equal).ignore_then(Self::expr_or_type_expr()))
-                .then_ignore(Self::select_token(WindToken::Semicolon))
+                .then_ignore(Self::select_token(WindToken::Semicolon).or_not())
                 .map(|((name, ty), value)| WindStmt::Let { name, ty, value: Box::new(value) });
 
             let assign_stmt = Self::expr_parser().then(Self::assign_op()).then(Self::expr_or_type_expr())
-                .then_ignore(Self::select_token(WindToken::Semicolon))
+                .then_ignore(Self::select_token(WindToken::Semicolon).or_not())
                 .map(|((target, op), value)| WindStmt::Assignment { target: Box::new(target), op, value: Box::new(value) });
 
-            let expr_stmt = Self::expr_or_type_expr().then_ignore(Self::select_token(WindToken::Semicolon))
+            let expr_stmt = Self::expr_or_type_expr().then_ignore(Self::select_token(WindToken::Semicolon).or_not())
                 .map(|e| WindStmt::Expr(Box::new(e)));
 
             let if_stmt = {
@@ -354,28 +425,54 @@ impl WindParser {
                     })
             };
 
-            let for_stmt = Self::select_token(WindToken::For).ignore_then(Self::select_token(WindToken::OpenParen))
-                .ignore_then(Self::expr_parser().or_not())
-                .then(Self::select_token(WindToken::Semicolon).ignore_then(Self::expr_parser().or_not()))
-                .then(Self::select_token(WindToken::Semicolon).ignore_then(Self::expr_parser().or_not()))
-                .then_ignore(Self::select_token(WindToken::CloseParen))
-                .then(block.clone())
-                .map(|(((init, cond), update), body)| {
-                    WindStmt::For { init: init.map(Box::new), condition: cond.map(Box::new), update: update.map(Box::new), body: Box::new(body) }
-                });
+            let for_stmt = {
+                let for_head = Self::select_token(WindToken::For).ignore_then(Self::select_token(WindToken::OpenParen));
+                
+                let c_style = Self::identifier()
+                    .then(Self::type_annotation().or_not())
+                    .then(Self::select_token(WindToken::Equal).ignore_then(Self::expr_or_type_expr()).or_not())
+                    .then(Self::select_token(WindToken::Semicolon).ignore_then(Self::expr_parser().or_not()))
+                    .then(Self::select_token(WindToken::Semicolon).ignore_then(Self::expr_parser().or_not()))
+                    .then_ignore(Self::select_token(WindToken::CloseParen))
+                    .then(block.clone())
+                    .map(|((((var, init), cond), update), body)| {
+                        let (name, ty) = var;
+                        let name_expr = match ty {
+                            Some(t) => WindExpr::TypeExpr { expr: Box::new(WindExpr::Identifier(name)), ty: t },
+                            None => WindExpr::Identifier(name),
+                        };
+                        WindStmt::For {
+                            init: init.or(Some(name_expr)).map(Box::new),
+                            condition: cond.map(Box::new),
+                            update: update.map(Box::new),
+                            body: Box::new(body),
+                        }
+                    });
+
+                let for_in = Self::identifier()
+                    .then_ignore(Self::select_token(WindToken::Colon))
+                    .then(Self::expr_parser())
+                    .then_ignore(Self::select_token(WindToken::CloseParen))
+                    .then(block.clone())
+                    .map(|((var, iterable), body)| {
+                        WindStmt::ForIn { var, iterable: Box::new(iterable), body: Box::new(body) }
+                    });
+
+                for_head.ignore_then(choice((c_style, for_in)))
+            };
 
             let while_stmt = Self::select_token(WindToken::While).ignore_then(Self::expr_parser()).then(block.clone())
                 .map(|(condition, body)| WindStmt::While { condition: Box::new(condition), body: Box::new(body) });
 
             let return_stmt = Self::select_token(WindToken::Return).ignore_then(Self::expr_or_type_expr().or_not())
-                .then_ignore(Self::select_token(WindToken::Semicolon))
+                .then_ignore(Self::select_token(WindToken::Semicolon).or_not())
                 .map(|e| WindStmt::Return(e.map(Box::new)));
 
             let fn_def = Self::visibility()
                 .then(Self::select_token(WindToken::Fn).ignore_then(Self::identifier()))
                 .then(
                     Self::select_token(WindToken::OpenParen)
-                        .ignore_then(Self::fn_param().separated_by(Self::select_token(WindToken::Comma)).collect())
+                        .ignore_then(Self::fn_param().separated_by(Self::select_token(WindToken::Comma)).allow_trailing().collect())
                         .then_ignore(Self::select_token(WindToken::CloseParen)),
                 )
                     .then(Self::select_token(WindToken::Arrow).ignore_then(Self::type_expr()).or_not())
@@ -388,25 +485,41 @@ impl WindParser {
             let struct_field = {
                 let where_body = Self::select_token(WindToken::Where)
                     .ignore_then(Self::select_token(WindToken::OpenBrace)
-                        .ignore_then(stmt.clone().repeated().collect())
+                        .ignore_then(
+                            Self::expr_or_type_expr()
+                                .separated_by(Self::select_token(WindToken::Semicolon))
+                                .allow_trailing()
+                                .collect()
+                        )
                         .then_ignore(Self::select_token(WindToken::CloseBrace))
                     );
                 let arrow_body = Self::select_token(WindToken::Arrow)
                     .ignore_then(Self::select_token(WindToken::OpenBrace)
-                        .ignore_then(stmt.clone().repeated().collect())
+                        .ignore_then(
+                            Self::expr_or_type_expr()
+                                .separated_by(Self::select_token(WindToken::Semicolon))
+                                .allow_trailing()
+                                .collect()
+                        )
                         .then_ignore(Self::select_token(WindToken::CloseBrace))
                     );
                 let conditions = where_body.or(arrow_body).or_not();
 
-                Self::visibility().then(Self::identifier())
+                let default_value = Self::select_token(WindToken::Equal)
+                    .ignore_then(Self::expr_or_type_expr())
+                    .or_not();
+
+                Self::select_token(WindToken::Static).or_not().then(Self::visibility()).then(Self::identifier())
                     .then(Self::select_token(WindToken::Colon).ignore_then(Self::type_expr()))
                     .then(conditions)
+                    .then(default_value)
                     .then_ignore(Self::select_token(WindToken::Semicolon))
-                    .map(|(((public, name), ty), conditions)| {
-                        let cond_expr = conditions.and_then(|stmts: Vec<WindStmt>| {
-                            stmts.into_iter().find_map(|s| if let WindStmt::Expr(e) = s { Some(*e) } else { None })
+                    .map(|(((((static_tok, vis), name), ty), conditions), default_val)| {
+                        let is_static = static_tok.is_some();
+                        let cond_expr = conditions.and_then(|exprs: Vec<WindExpr>| {
+                            exprs.into_iter().next()
                         });
-                        WindStructField { public, name, ty, which: None, conditions: cond_expr }
+                        WindStructField { public: vis, is_static, name, ty, which: None, conditions: cond_expr, default_value: default_val.map(Box::new) }
                     })
             };
 
@@ -425,7 +538,7 @@ impl WindParser {
                     .then(Self::select_token(WindToken::Enum).ignore_then(Self::identifier()))
                     .then(
                         Self::select_token(WindToken::OpenBrace)
-                            .ignore_then(variant.separated_by(Self::select_token(WindToken::Comma)).collect())
+                            .ignore_then(variant.separated_by(Self::select_token(WindToken::Comma)).allow_trailing().collect())
                             .then_ignore(Self::select_token(WindToken::CloseBrace)),
                     )
                     .map(|((public, name), variants)| WindStmt::EnumDef { public, name, variants })
@@ -447,14 +560,22 @@ impl WindParser {
             };
 
             let const_def = Self::select_token(WindToken::Const).ignore_then(Self::identifier())
+                .then(Self::type_annotation())
                 .then(Self::select_token(WindToken::Equal).ignore_then(Self::expr_or_type_expr()))
                 .then_ignore(Self::select_token(WindToken::Semicolon))
-                .map(|(name, value)| WindStmt::ConstDef { name, value: Box::new(value) });
+                .map(|((name, ty), value)| WindStmt::ConstDef { name, ty, value: Box::new(value) });
 
             let constatic_def = Self::select_token(WindToken::Constatic).ignore_then(Self::identifier())
+                .then(Self::type_annotation())
                 .then(Self::select_token(WindToken::Equal).ignore_then(Self::expr_or_type_expr()))
                 .then_ignore(Self::select_token(WindToken::Semicolon))
-                .map(|(name, value)| WindStmt::ConstaticDef { name, value: Box::new(value) });
+                .map(|((name, ty), value)| WindStmt::ConstaticDef { name, ty, value: Box::new(value) });
+
+            let explain_def = Self::select_token(WindToken::Explain).ignore_then(Self::identifier())
+                .then(Self::type_annotation())
+                .then(Self::select_token(WindToken::Equal).ignore_then(Self::expr_or_type_expr()))
+                .then_ignore(Self::select_token(WindToken::Semicolon))
+                .map(|((name, ty), value)| WindStmt::ExplainDef { name, ty, value: Box::new(value) });
 
             let tag_def = {
                 let tag_body = Self::select_token(WindToken::OpenBrace)
@@ -482,7 +603,7 @@ impl WindParser {
                     .then(Self::select_token(WindToken::Fn).ignore_then(Self::identifier()))
                     .then(
                         Self::select_token(WindToken::OpenParen)
-                            .ignore_then(Self::fn_param().separated_by(Self::select_token(WindToken::Comma)).collect())
+                            .ignore_then(Self::fn_param().separated_by(Self::select_token(WindToken::Comma)).allow_trailing().collect())
                             .then_ignore(Self::select_token(WindToken::CloseParen)),
                     )
                     .then(Self::select_token(WindToken::Arrow).ignore_then(Self::type_expr()).or_not())
@@ -505,7 +626,7 @@ impl WindParser {
                     .then(Self::select_token(WindToken::Fn).ignore_then(Self::identifier()))
                     .then(
                         Self::select_token(WindToken::OpenParen)
-                            .ignore_then(Self::fn_param().separated_by(Self::select_token(WindToken::Comma)).collect())
+                            .ignore_then(Self::fn_param().separated_by(Self::select_token(WindToken::Comma)).allow_trailing().collect())
                             .then_ignore(Self::select_token(WindToken::CloseParen)),
                     )
                     .then(Self::select_token(WindToken::Arrow).ignore_then(Self::type_expr()).or_not())
@@ -540,7 +661,7 @@ impl WindParser {
                     .then(Self::select_token(WindToken::Fn).ignore_then(Self::identifier()))
                     .then(
                         Self::select_token(WindToken::OpenParen)
-                            .ignore_then(Self::fn_param().separated_by(Self::select_token(WindToken::Comma)).collect())
+                            .ignore_then(Self::fn_param().separated_by(Self::select_token(WindToken::Comma)).allow_trailing().collect())
                             .then_ignore(Self::select_token(WindToken::CloseParen)),
                     )
                     .then(Self::select_token(WindToken::Arrow).ignore_then(Self::type_expr()).or_not())
@@ -611,14 +732,14 @@ impl WindParser {
                 Self::identifier()
                     .then(Self::select_token(WindToken::At).ignore_then(Self::identifier()))
                     .then(Self::select_token(WindToken::Arrow).ignore_then(fields))
-                    .then_ignore(Self::select_token(WindToken::Semicolon))
+                    .then_ignore(Self::select_token(WindToken::Semicolon).or_not())
                     .map(|((group, target), fields)| WindStmt::Apply { group, target, fields })
             };
 
             choice((
                 fn_def, struct_def, enum_def, type_def, trait_def,
                 extra_def, impl_def, group_def, apply_stmt, tag_def,
-                const_def, constatic_def, to_stmt,
+                const_def, constatic_def, explain_def, to_stmt,
                 if_stmt, for_stmt, while_stmt, return_stmt,
                 let_stmt, assign_stmt, expr_stmt,
             ))
@@ -626,7 +747,7 @@ impl WindParser {
             .repeated().collect().map(|items| WindProgram { items }).then_ignore(end())
     }
 
-    pub fn parse(tokens: &[WindSpannedToken]) -> Result<WindProgram, Vec<WindParseError>> {
+    pub fn parse(source: &str, tokens: &[WindSpannedToken]) -> Result<WindProgram, Vec<WindParseError>> {
         log::debug!("开始语法分析, 输入 {} 个标记", tokens.len());
 
         let eoi = tokens.last()
@@ -657,8 +778,10 @@ impl WindParser {
                                 &_ => "<unknown>".to_string(),
                             })
                             .collect();
+                        let (line, col) = crate::modules::types::tokens::byte_to_line_col(source, span.start);
                         let msg = format!(
-                            "语法错误 #{i}: 发现 {}, 期望 {}",
+                            "语法错误 #{i} [{}:{}]: 发现 {}, 期望 {}",
+                            line, col,
                             found.as_ref().map(|t| format!("{t:?}")).as_deref().unwrap_or("<无>"),
                             if expected.is_empty() { "<未知>".to_string() } else { expected.join(", ") },
                         );

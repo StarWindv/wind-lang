@@ -29,6 +29,7 @@ impl fmt::Display for WindType {
                 }
                 write!(f, ") -> {ret}")
             }
+            WindType::SelfType => write!(f, "Self"),
         }
     }
 }

@@ -2,4 +2,8 @@
 pub enum WindUnaryOp {
     Neg,
     Not,
+    Inc,
+    Dec,
+    IncPost,
+    DecPost,
 }
