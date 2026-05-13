@@ -1,65 +1,98 @@
 use chumsky::IterParser;
 use chumsky::Parser;
-use chumsky::prelude::{any, choice, end, recursive};
+use chumsky::prelude::{choice, end, just, recursive};
 use chumsky::pratt;
-use crate::modules::types::ast::{WindAssignOp, WindBinaryOp, WindExpr, WindFnParam, WindFnSignature, WindGroupRule, WindTokenSlice, WindParseError, WindProgram, WindStmt, WindStructField, WindType, WindUnaryOp, WindWhichClause, WindParser};
-use crate::modules::types::tokens::{WindSpannedToken, WindToken};
+use chumsky::input::{Stream, ValueInput, Input};
+use chumsky::extra;
+use chumsky::error::Rich;
+use chumsky::error::RichPattern;
+use crate::modules::types::ast::{WindAssignOp, WindBinaryOp, WindExpr, WindFnParam, WindFnSignature, WindGroupRule, WindParseError, WindProgram, WindStmt, WindStructField, WindType, WindUnaryOp, WindWhichClause, WindParser};
+use crate::modules::types::tokens::{WindSpannedToken, WindToken, WindSpan};
+
+type WindRichErr<'a> = extra::Err<Rich<'a, WindToken, WindSpan>>;
 
 impl WindParser {
-    fn select_token<'a>(tok: WindToken) -> impl Parser<'a, WindTokenSlice<'a>, WindToken> + Clone {
-        any().filter_map(move |(t, _): WindSpannedToken| if t == tok { Some(tok.clone()) } else { None })
+    fn select_token<'a, I>(tok: WindToken) -> impl Parser<'a, I, WindToken, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
+        let t = tok.clone();
+        just(tok).labelled(format!("{t:?}"))
     }
 
-    fn identifier<'a>() -> impl Parser<'a, WindTokenSlice<'a>, String> + Clone {
-        any().filter_map(|(t, _): WindSpannedToken| if let WindToken::Identifier(s) = t { Some(s) } else { None })
+    fn identifier<'a, I>() -> impl Parser<'a, I, String, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
+        chumsky::select! {
+            WindToken::Identifier(s) => s,
+        }.labelled("identifier")
     }
 
-    fn self_keyword<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindExpr> + Clone {
-        any().filter_map(|(t, _): WindSpannedToken| {
-            match t {
-                WindToken::SelfKw => Some(WindExpr::Identifier("self".to_string())),
-                WindToken::ThisKw => Some(WindExpr::Identifier("this".to_string())),
-                WindToken::ItKw => Some(WindExpr::Identifier("it".to_string())),
-                _ => None,
-            }
-        })
+    fn self_keyword<'a, I>() -> impl Parser<'a, I, WindExpr, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
+        chumsky::select! {
+            WindToken::SelfKw => WindExpr::Identifier("self".to_string()),
+            WindToken::ThisKw => WindExpr::Identifier("this".to_string()),
+            WindToken::ItKw => WindExpr::Identifier("it".to_string()),
+        }.labelled("self|this|it")
     }
 
-    fn int_literal<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindExpr> + Clone {
-        any().filter_map(|(t, _): WindSpannedToken| if let WindToken::IntLiteral(n) = t { Some(WindExpr::IntLiteral(n)) } else { None })
+    fn int_literal<'a, I>() -> impl Parser<'a, I, WindExpr, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
+        chumsky::select! {
+            WindToken::IntLiteral(n) => WindExpr::IntLiteral(n),
+        }.labelled("integer")
     }
 
-    fn float_literal<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindExpr> + Clone {
-        any().filter_map(|(t, _): WindSpannedToken| {
-            if let WindToken::FloatLiteral(s) = t { s.parse::<f64>().ok().map(WindExpr::FloatLiteral) } else { None }
-        })
+    fn float_literal<'a, I>() -> impl Parser<'a, I, WindExpr, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
+        chumsky::select! {
+            WindToken::FloatLiteral(s) => WindExpr::FloatLiteral(s.parse::<f64>().unwrap()),
+        }.labelled("float")
     }
 
-    fn string_literal<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindExpr> + Clone {
-        any().filter_map(|(t, _): WindSpannedToken| if let WindToken::StringLiteral(s) = t { Some(WindExpr::StringLiteral(s)) } else { None })
+    fn string_literal<'a, I>() -> impl Parser<'a, I, WindExpr, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
+        chumsky::select! {
+            WindToken::StringLiteral(s) => WindExpr::StringLiteral(s),
+        }.labelled("string")
     }
 
-    fn char_literal<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindExpr> + Clone {
-        any().filter_map(|(t, _): WindSpannedToken| if let WindToken::CharLiteral(s) = t { Some(WindExpr::CharLiteral(s)) } else { None })
+    fn char_literal<'a, I>() -> impl Parser<'a, I, WindExpr, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
+        chumsky::select! {
+            WindToken::CharLiteral(s) => WindExpr::CharLiteral(s),
+        }.labelled("char")
     }
 
-    fn bool_literal<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindExpr> + Clone {
-        any().filter_map(|(t, _): WindSpannedToken| match &t {
-            WindToken::TrueKw => Some(WindExpr::BoolLiteral(true)),
-            WindToken::FalseKw => Some(WindExpr::BoolLiteral(false)),
-            _ => None,
-        })
+    fn bool_literal<'a, I>() -> impl Parser<'a, I, WindExpr, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
+        chumsky::select! {
+            WindToken::TrueKw => WindExpr::BoolLiteral(true),
+            WindToken::FalseKw => WindExpr::BoolLiteral(false),
+        }.labelled("bool")
     }
 
-    fn none_literal<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindExpr> + Clone {
-        Self::select_token(WindToken::NoneKw).to(WindExpr::NoneLiteral)
+    fn none_literal<'a, I>() -> impl Parser<'a, I, WindExpr, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
+        just(WindToken::NoneKw).to(WindExpr::NoneLiteral).labelled("None")
     }
 
-    fn ident_expr<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindExpr> + Clone {
+    fn ident_expr<'a, I>() -> impl Parser<'a, I, WindExpr, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
         Self::identifier().map(WindExpr::Identifier)
     }
 
-    fn type_expr<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindType> + Clone {
+    fn type_expr<'a, I>() -> impl Parser<'a, I, WindType, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
         recursive(|type_rec| {
             let generic_args = Self::select_token(WindToken::Less)
                 .ignore_then(type_rec.clone().separated_by(Self::select_token(WindToken::Comma)).collect())
@@ -77,15 +110,21 @@ impl WindParser {
         })
     }
 
-    fn type_annotation<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindType> + Clone {
+    fn type_annotation<'a, I>() -> impl Parser<'a, I, WindType, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
         Self::select_token(WindToken::Colon).ignore_then(Self::type_expr())
     }
 
-    fn fn_param<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindFnParam> + Clone {
+    fn fn_param<'a, I>() -> impl Parser<'a, I, WindFnParam, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
         Self::identifier().then(Self::type_annotation().or_not()).map(|(name, ty)| WindFnParam { name, ty })
     }
 
-    fn assign_op<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindAssignOp> + Clone {
+    fn assign_op<'a, I>() -> impl Parser<'a, I, WindAssignOp, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
         choice((
             Self::select_token(WindToken::LeftAssign).to(WindAssignOp::LeftAbs),
             Self::select_token(WindToken::RightAssign).to(WindAssignOp::RightAbs),
@@ -93,7 +132,9 @@ impl WindParser {
         ))
     }
 
-    fn which_clause_parser<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindWhichClause> + Clone {
+    fn which_clause_parser<'a, I>() -> impl Parser<'a, I, WindWhichClause, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
         let method_ref = Self::select_token(WindToken::DoubleColon).ignore_then(Self::identifier())
             .map(|id| format!("::{id}"))
             .or(Self::identifier());
@@ -103,177 +144,187 @@ impl WindParser {
             .map(|after| WindWhichClause { method: String::new(), after })
     }
 
-    fn make_fn_which_clause<'a>() -> impl Parser<'a, WindTokenSlice<'a>, Option<Vec<WindWhichClause>>> + Clone {
+    fn make_fn_which_clause<'a, I>() -> impl Parser<'a, I, Option<Vec<WindWhichClause>>, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
         Self::select_token(WindToken::Comma)
             .ignore_then(Self::which_clause_parser())
             .map(|w| vec![w])
             .or_not()
     }
 
-    fn expr_parser<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindExpr> + Clone {
-    recursive(|full_expr| {
-        let literal = choice((
-            Self::float_literal(), Self::int_literal(), Self::string_literal(),
-            Self::char_literal(), Self::bool_literal(), Self::none_literal(),
-        ));
+    fn expr_parser<'a, I>() -> impl Parser<'a, I, WindExpr, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
+        recursive(|full_expr| {
+            let literal = choice((
+                Self::float_literal(), Self::int_literal(), Self::string_literal(),
+                Self::char_literal(), Self::bool_literal(), Self::none_literal(),
+            ));
 
-        let group = Self::select_token(WindToken::OpenParen)
-            .ignore_then(full_expr.clone())
-            .then_ignore(Self::select_token(WindToken::CloseParen))
-            .map(|e| WindExpr::Group(Box::new(e)));
+            let group = Self::select_token(WindToken::OpenParen)
+                .ignore_then(full_expr.clone())
+                .then_ignore(Self::select_token(WindToken::CloseParen))
+                .map(|e| WindExpr::Group(Box::new(e)));
 
-        let if_expr = Self::select_token(WindToken::If)
-            .ignore_then(full_expr.clone())
-            .then(
-                Self::select_token(WindToken::OpenBrace)
-                    .ignore_then(full_expr.clone())
-                    .then_ignore(Self::select_token(WindToken::CloseBrace))
-            )
-            .then(
-                Self::select_token(WindToken::Else).ignore_then(
+            let if_expr = Self::select_token(WindToken::If)
+                .ignore_then(full_expr.clone())
+                .then(
                     Self::select_token(WindToken::OpenBrace)
                         .ignore_then(full_expr.clone())
                         .then_ignore(Self::select_token(WindToken::CloseBrace))
-                ).or_not()
-            )
-            .map(|((condition, then_branch), else_branch)| {
-                WindExpr::IfExpr {
-                    condition: Box::new(condition),
-                    then_branch: Box::new(then_branch),
-                    else_branch: else_branch.map(Box::new),
-                }
-            });
+                )
+                .then(
+                    Self::select_token(WindToken::Else).ignore_then(
+                        Self::select_token(WindToken::OpenBrace)
+                            .ignore_then(full_expr.clone())
+                            .then_ignore(Self::select_token(WindToken::CloseBrace))
+                    ).or_not()
+                )
+                .map(|((condition, then_branch), else_branch)| {
+                    WindExpr::IfExpr {
+                        condition: Box::new(condition),
+                        then_branch: Box::new(then_branch),
+                        else_branch: else_branch.map(Box::new),
+                    }
+                });
 
-        let map_literal = {
-            let pair = full_expr.clone().then_ignore(Self::select_token(WindToken::Colon)).then(full_expr.clone());
-            Self::select_token(WindToken::OpenBrace)
-                .ignore_then(pair.separated_by(Self::select_token(WindToken::Comma)).collect())
-                .then_ignore(Self::select_token(WindToken::CloseBrace))
-                .map(WindExpr::MapLiteral)
-        };
+            let map_literal = {
+                let pair = full_expr.clone().then_ignore(Self::select_token(WindToken::Colon)).then(full_expr.clone());
+                Self::select_token(WindToken::OpenBrace)
+                    .ignore_then(pair.separated_by(Self::select_token(WindToken::Comma)).collect())
+                    .then_ignore(Self::select_token(WindToken::CloseBrace))
+                    .map(WindExpr::MapLiteral)
+            };
 
-        let array_literal = Self::select_token(WindToken::OpenBracket)
-            .ignore_then(full_expr.clone().separated_by(Self::select_token(WindToken::Comma)).collect())
-            .then_ignore(Self::select_token(WindToken::CloseBracket))
-            .map(WindExpr::ArrayLiteral);
+            let array_literal = Self::select_token(WindToken::OpenBracket)
+                .ignore_then(full_expr.clone().separated_by(Self::select_token(WindToken::Comma)).collect())
+                .then_ignore(Self::select_token(WindToken::CloseBracket))
+                .map(WindExpr::ArrayLiteral);
 
-        let atom = choice((
-            literal, group, if_expr, map_literal, array_literal,
-            Self::self_keyword(), Self::ident_expr(),
-        ));
+            let atom = choice((
+                literal, group, if_expr, map_literal, array_literal,
+                Self::self_keyword(), Self::ident_expr(),
+            ));
 
-        let call_args = Self::select_token(WindToken::OpenParen)
-            .ignore_then(full_expr.clone().separated_by(Self::select_token(WindToken::Comma)).collect())
-            .then_ignore(Self::select_token(WindToken::CloseParen));
+            let call_args = Self::select_token(WindToken::OpenParen)
+                .ignore_then(full_expr.clone().separated_by(Self::select_token(WindToken::Comma)).collect())
+                .then_ignore(Self::select_token(WindToken::CloseParen));
 
-        let postfix_pref_infix_lo = (
-            pratt::postfix(12, call_args, |lhs, args, _span| {
-                WindExpr::Call { callee: Box::new(lhs), args }
-            }),
-            pratt::postfix(12, Self::select_token(WindToken::Dot).ignore_then(Self::identifier()), |lhs, field, _span| {
-                WindExpr::FieldAccess { object: Box::new(lhs), field }
-            }),
-            pratt::postfix(12, Self::select_token(WindToken::DoubleColon).ignore_then(Self::identifier()), |lhs, member, _span| {
-                WindExpr::ScopeRef { object: Box::new(lhs), member }
-            }),
-            pratt::postfix(12,
-                Self::select_token(WindToken::OpenBracket)
-                    .ignore_then(full_expr.clone())
-                    .then_ignore(Self::select_token(WindToken::CloseBracket)),
-                |lhs, idx, _span| WindExpr::Index { expr: Box::new(lhs), index: Box::new(idx) },
-            ),
-            pratt::prefix(11, Self::select_token(WindToken::Minus).to(WindUnaryOp::Neg), |_op, rhs, _span| {
-                WindExpr::Unary { op: WindUnaryOp::Neg, expr: Box::new(rhs) }
-            }),
-            pratt::prefix(11, Self::select_token(WindToken::Bang).to(WindUnaryOp::Not), |_op, rhs, _span| {
-                WindExpr::Unary { op: WindUnaryOp::Not, expr: Box::new(rhs) }
-            }),
-            pratt::infix(pratt::left(10), Self::select_token(WindToken::Star).to(WindBinaryOp::Mul), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(10), Self::select_token(WindToken::Slash).to(WindBinaryOp::Div), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(10), Self::select_token(WindToken::DoubleSlash).to(WindBinaryOp::IntDiv), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(10), Self::select_token(WindToken::Percent).to(WindBinaryOp::Mod), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(9), Self::select_token(WindToken::Plus).to(WindBinaryOp::Add), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(9), Self::select_token(WindToken::Minus).to(WindBinaryOp::Sub), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(8), Self::select_token(WindToken::LeftShift).to(WindBinaryOp::Shl), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(8), Self::select_token(WindToken::RightShift).to(WindBinaryOp::Shr), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(7), Self::select_token(WindToken::Less).to(WindBinaryOp::Lt), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(7), Self::select_token(WindToken::Greater).to(WindBinaryOp::Gt), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(7), Self::select_token(WindToken::LessEqual).to(WindBinaryOp::Le), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(7), Self::select_token(WindToken::GreaterEqual).to(WindBinaryOp::Ge), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(7), Self::select_token(WindToken::NotLess).to(WindBinaryOp::NotLt), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(7), Self::select_token(WindToken::NotGreater).to(WindBinaryOp::NotGt), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(7), Self::select_token(WindToken::In).to(WindBinaryOp::In), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(6), Self::select_token(WindToken::EqualEqual).to(WindBinaryOp::Eq), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(6), Self::select_token(WindToken::NotEqual).to(WindBinaryOp::Neq), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(5), Self::select_token(WindToken::Amp).to(WindBinaryOp::BitAnd), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(4), Self::select_token(WindToken::Caret).to(WindBinaryOp::BitXor), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(3), Self::select_token(WindToken::Pipe).to(WindBinaryOp::BitOr), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-        );
+            let postfix_pref_infix_lo = (
+                pratt::postfix(12, call_args, |lhs, args, _span| {
+                    WindExpr::Call { callee: Box::new(lhs), args }
+                }),
+                pratt::postfix(12, Self::select_token(WindToken::Dot).ignore_then(Self::identifier()), |lhs, field, _span| {
+                    WindExpr::FieldAccess { object: Box::new(lhs), field }
+                }),
+                pratt::postfix(12, Self::select_token(WindToken::DoubleColon).ignore_then(Self::identifier()), |lhs, member, _span| {
+                    WindExpr::ScopeRef { object: Box::new(lhs), member }
+                }),
+                pratt::postfix(12,
+                    Self::select_token(WindToken::OpenBracket)
+                        .ignore_then(full_expr.clone())
+                        .then_ignore(Self::select_token(WindToken::CloseBracket)),
+                    |lhs, idx, _span| WindExpr::Index { expr: Box::new(lhs), index: Box::new(idx) },
+                ),
+                pratt::prefix(11, Self::select_token(WindToken::Minus).to(WindUnaryOp::Neg), |_op, rhs, _span| {
+                    WindExpr::Unary { op: WindUnaryOp::Neg, expr: Box::new(rhs) }
+                }),
+                pratt::prefix(11, Self::select_token(WindToken::Bang).to(WindUnaryOp::Not), |_op, rhs, _span| {
+                    WindExpr::Unary { op: WindUnaryOp::Not, expr: Box::new(rhs) }
+                }),
+                pratt::infix(pratt::left(10), Self::select_token(WindToken::Star).to(WindBinaryOp::Mul), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(10), Self::select_token(WindToken::Slash).to(WindBinaryOp::Div), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(10), Self::select_token(WindToken::DoubleSlash).to(WindBinaryOp::IntDiv), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(10), Self::select_token(WindToken::Percent).to(WindBinaryOp::Mod), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(9), Self::select_token(WindToken::Plus).to(WindBinaryOp::Add), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(9), Self::select_token(WindToken::Minus).to(WindBinaryOp::Sub), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(8), Self::select_token(WindToken::LeftShift).to(WindBinaryOp::Shl), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(8), Self::select_token(WindToken::RightShift).to(WindBinaryOp::Shr), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(7), Self::select_token(WindToken::Less).to(WindBinaryOp::Lt), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(7), Self::select_token(WindToken::Greater).to(WindBinaryOp::Gt), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(7), Self::select_token(WindToken::LessEqual).to(WindBinaryOp::Le), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(7), Self::select_token(WindToken::GreaterEqual).to(WindBinaryOp::Ge), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(7), Self::select_token(WindToken::NotLess).to(WindBinaryOp::NotLt), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(7), Self::select_token(WindToken::NotGreater).to(WindBinaryOp::NotGt), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(7), Self::select_token(WindToken::In).to(WindBinaryOp::In), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(6), Self::select_token(WindToken::EqualEqual).to(WindBinaryOp::Eq), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(6), Self::select_token(WindToken::NotEqual).to(WindBinaryOp::Neq), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(5), Self::select_token(WindToken::Amp).to(WindBinaryOp::BitAnd), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(4), Self::select_token(WindToken::Caret).to(WindBinaryOp::BitXor), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(3), Self::select_token(WindToken::Pipe).to(WindBinaryOp::BitOr), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+            );
 
-        let infix_hi = (
-            pratt::infix(pratt::left(2), Self::select_token(WindToken::AndAnd).to(WindBinaryOp::And), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-            pratt::infix(pratt::left(1), Self::select_token(WindToken::OrOr).to(WindBinaryOp::Or), |l, op, r, _| {
-                WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
-            }),
-        );
+            let infix_hi = (
+                pratt::infix(pratt::left(2), Self::select_token(WindToken::AndAnd).to(WindBinaryOp::And), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+                pratt::infix(pratt::left(1), Self::select_token(WindToken::OrOr).to(WindBinaryOp::Or), |l, op, r, _| {
+                    WindExpr::Binary { left: Box::new(l), op, right: Box::new(r) }
+                }),
+            );
 
-        atom.pratt(postfix_pref_infix_lo).pratt(infix_hi)
-    })
-}
+            atom.pratt(postfix_pref_infix_lo).pratt(infix_hi)
+        })
+    }
 
-    fn expr_or_type_expr<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindExpr> + Clone {
+    fn expr_or_type_expr<'a, I>() -> impl Parser<'a, I, WindExpr, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
         Self::expr_parser().then(Self::type_annotation().or_not())
             .map(|(e, ty)| if let Some(t) = ty { WindExpr::TypeExpr { expr: Box::new(e), ty: t } } else { e })
     }
 
-    fn visibility<'a>() -> impl Parser<'a, WindTokenSlice<'a>, bool> + Clone {
+    fn visibility<'a, I>() -> impl Parser<'a, I, bool, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
         choice((Self::select_token(WindToken::Pub), Self::select_token(WindToken::Public)))
             .or_not().map(|p| p.is_some())
     }
 
-    fn program_parser<'a>() -> impl Parser<'a, WindTokenSlice<'a>, WindProgram> + Clone {
+    fn program_parser<'a, I>() -> impl Parser<'a, I, WindProgram, WindRichErr<'a>> + Clone
+    where I: ValueInput<'a, Token = WindToken, Span = WindSpan>
+    {
         recursive(|stmt| {
             let block = Self::select_token(WindToken::OpenBrace)
                 .ignore_then(stmt.clone().repeated().collect())
@@ -578,7 +629,13 @@ impl WindParser {
     pub fn parse(tokens: &[WindSpannedToken]) -> Result<WindProgram, Vec<WindParseError>> {
         log::debug!("开始语法分析, 输入 {} 个标记", tokens.len());
 
-        match Self::program_parser().parse(tokens).into_result() {
+        let eoi = tokens.last()
+            .map(|(_, s)| s.end..s.end)
+            .unwrap_or(0..0);
+        let input = Stream::from_iter(tokens.iter().cloned())
+            .map(eoi.into(), |(t, s): (WindToken, WindSpan)| (t, s));
+
+        match Self::program_parser().parse(input).into_result() {
             Ok(program) => {
                 log::debug!("语法分析成功: {} 个顶层条目", program.items.len());
                 Ok(program)
@@ -588,9 +645,25 @@ impl WindParser {
                     .into_iter()
                     .enumerate()
                     .map(|(i, e)| {
-                        let msg = format!("语法错误 #{i}: {e}");
+                        let span = e.span().clone();
+                        let found = e.found().cloned();
+                        let expected: Vec<String> = e.expected()
+                            .map(|p| match p {
+                                RichPattern::Token(t) => format!("{t:?}"),
+                                RichPattern::Label(label) => label.to_string(),
+                                RichPattern::Identifier(id) => id.clone(),
+                                RichPattern::Any => "<any>".to_string(),
+                                RichPattern::SomethingElse => "<something>".to_string(),
+                                &_ => "<unknown>".to_string(),
+                            })
+                            .collect();
+                        let msg = format!(
+                            "语法错误 #{i}: 发现 {}, 期望 {}",
+                            found.as_ref().map(|t| format!("{t:?}")).as_deref().unwrap_or("<无>"),
+                            if expected.is_empty() { "<未知>".to_string() } else { expected.join(", ") },
+                        );
                         log::error!("{msg}");
-                        WindParseError { message: msg, span: 0..0, found: None, expected: vec![] }
+                        WindParseError { message: msg, span, found, expected }
                     })
                     .collect();
                 Err(parse_errors)
