@@ -1,6 +1,5 @@
 use logos::Logos;
 
-
 pub type WindSpan = std::ops::Range<usize>;
 
 pub type WindSpannedToken = (WindToken, WindSpan);
@@ -12,7 +11,6 @@ pub fn byte_to_line_col(source: &str, offset: usize) -> (usize, usize) {
     let col = offset - last_nl + 1;
     (line, col)
 }
-
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Hash)]
 #[logos(
@@ -218,4 +216,3 @@ pub enum WindToken {
     #[regex(r"`[^\r\n]*", allow_greedy = true)]
     LineComment,
 }
-

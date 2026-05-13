@@ -1,5 +1,5 @@
-use std::fmt;
 use crate::modules::types::ast::WindType;
+use std::fmt;
 
 impl fmt::Display for WindType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

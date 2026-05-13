@@ -1,7 +1,7 @@
 use super::binary_op::WindBinaryOp;
-use super::unary_op::WindUnaryOp;
-use super::ty::WindType;
 use super::stmt::WindStmt;
+use super::ty::WindType;
+use super::unary_op::WindUnaryOp;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum WindExpr {

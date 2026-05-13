@@ -1,7 +1,7 @@
 use crate::modules::types::tokens::WindSpan;
 
-pub mod tokens;
 pub mod ast;
+pub mod tokens;
 
 #[derive(Debug, Clone)]
 pub struct LexError {
