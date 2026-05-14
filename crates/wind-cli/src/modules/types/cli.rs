@@ -6,7 +6,7 @@ use std::path::PathBuf;
 #[command(name = "wind-cli", about = "Wind 语言工具链")]
 #[command(group(
     ArgGroup::new("mode")
-        .args(["lex", "parse"])
+        .args(["lex", "parse", "check"])
         .multiple(false)
 ))]
 pub struct Cli {
@@ -24,6 +24,10 @@ pub struct Cli {
     /// 执行词法 + 语法分析并输出 AST
     #[arg(short, long)]
     pub parse: bool,
+
+    /// 执行词法 + 语法 + 语义分析
+    #[arg(short = 'k', long)]
+    pub check: bool,
 
     /// 日志级别 (debug/info/warn/error), 默认 info
     #[arg(short = 'L', long, value_enum, default_value = "info")]

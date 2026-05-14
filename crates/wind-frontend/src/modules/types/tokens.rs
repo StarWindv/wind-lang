@@ -10,7 +10,7 @@ pub type WindSpannedToken = (WindToken, WindSpan);
 #[logos(
     skip r"[ \t\n\r\f]+",
     skip r"\\[ \t]*\n",
-    skip r"```[\s\S]*?```"
+    skip r"```[^`]*```"
 )]
 pub enum WindToken {
     #[token("fn")]
@@ -55,7 +55,6 @@ pub enum WindToken {
     Elif,
     #[token("else")]
     Else,
-
     #[token("tag")]
     Tag,
     #[token("explain")]

@@ -12,6 +12,9 @@ fn main() {
         Utils::run_lex(&source);
     } else if cli.parse {
         Utils::run_parse(&source);
+    } else if cli.check {
+        let name = Utils::resolve_file_name(&cli);
+        Utils::run_check(&source, &name);
     } else {
         log::info!("Not Implemented");
     }

@@ -11,6 +11,6 @@ description = "这里是 wind-lang 的语义分析子包"
 path = "src/lib.rs"
 
 [dependencies]
+wind-frontend = { path = "../wind-frontend" }
 log = { workspace = true }
-recursion = { workspace = true }
 codespan-reporting = { workspace = true }
