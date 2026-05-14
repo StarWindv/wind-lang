@@ -1,5 +1,5 @@
 use clap::Parser;
-use wind::{Cli, Utils};
+use wind_cli::{Cli, Utils};
 
 
 fn main() {

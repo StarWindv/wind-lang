@@ -3,7 +3,7 @@ use clap::{ArgGroup, Parser as ClapParser};
 use std::path::PathBuf;
 
 #[derive(ClapParser, Debug)]
-#[command(name = "wind", about = "Wind 语言工具链")]
+#[command(name = "wind-cli", about = "Wind 语言工具链")]
 #[command(group(
     ArgGroup::new("mode")
         .args(["lex", "parse"])
