@@ -96,9 +96,7 @@ pub enum WindStmt {
         ty: WindType,
         value: Box<WindExpr>,
     },
-    ToStmt {
-        tag: String,
-    },
+
     Apply {
         group: String,
         target: String,

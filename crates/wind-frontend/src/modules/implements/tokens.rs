@@ -27,7 +27,7 @@ impl WindToken {
             WindToken::If => Some("if"),
             WindToken::Elif => Some("elif"),
             WindToken::Else => Some("else"),
-            WindToken::To => Some("to"),
+
             WindToken::Tag => Some("tag"),
             WindToken::SelfKw => Some("self"),
             WindToken::ThisKw => Some("this"),

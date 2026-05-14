@@ -1009,10 +1009,6 @@ impl WindParser {
                     })
             };
 
-            let to_stmt = Self::select_token(WindToken::To)
-                .ignore_then(Self::identifier())
-                .then_ignore(Self::select_token(WindToken::Semicolon))
-                .map(|tag| WindStmt::ToStmt { tag });
 
             let trait_def = {
                 let sig = Self::visibility()
@@ -1250,7 +1246,7 @@ impl WindParser {
                 const_def,
                 constatic_def,
                 explain_def,
-                to_stmt,
+
                 if_stmt,
                 for_stmt,
                 while_stmt,

@@ -55,8 +55,7 @@ pub enum WindToken {
     Elif,
     #[token("else")]
     Else,
-    #[token("to")]
-    To,
+
     #[token("tag")]
     Tag,
     #[token("explain")]

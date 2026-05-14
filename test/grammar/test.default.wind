@@ -107,6 +107,37 @@ fn main(args: vec<string>) -> int {
         "admin",
          9 + 9 * 2 / 3 + 3
     );
+    me <: admin;
     output(admin);
+    output(me);
     ` or: output(admin.str());
 }
+
+to abcdefg;
+a = 5;
+```
+这里显然不合适!
+顶层的关键字是有限的, 不能在这里用to或者各种赋值以及别的操作!
+但是现在前端生成了这个!
+[17:37:58] [INFO ]   [17] Expr(
+    Identifier(
+        "to",
+    ),
+)
+[17:37:58] [INFO ]   [18] Expr(
+    Identifier(
+        "abcdefg",
+    ),
+)
+[17:37:58] [INFO ]   [19] Let {
+    name: "a",
+    ty: None,
+    value: IntLiteral(
+        5,
+    ),
+}
+```
+
+```
+此问题将在语义分析中处理.
+```
