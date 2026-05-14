@@ -1,6 +1,7 @@
 use crate::modules::types::LexError;
 use crate::modules::types::tokens::{WindSpannedToken, WindToken};
 use logos::Logos;
+use crate::lexer::byte_to_line_col;
 
 impl WindToken {
     pub fn as_keyword_str(&self) -> Option<&'static str> {
@@ -57,7 +58,7 @@ impl WindToken {
                 Err(()) => {
                     let sliced = &source[span.clone()];
                     let (line, col) =
-                        crate::modules::types::tokens::byte_to_line_col(source, span.start);
+                        byte_to_line_col(source, span.start);
                     let msg = format!("词法错误 [{line}:{col}]: 无法识别的字符序列 `{sliced}`");
                     log::error!("{msg}");
                     errors.push(LexError { message: msg, span });

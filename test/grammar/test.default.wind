@@ -25,6 +25,7 @@ pub struct TestStruct {
     pub data: map;
 }
 
+
 impl DisplayJson for TestStruct {
     pub fn str(self) -> string {
         result: string = "{\n";
@@ -81,7 +82,7 @@ extra User {
 
     fn str(self) -> String {
         return "\
-Name : {sele.name}\n\
+Name : {self.name}\n\
 Age  : {self.age}\n\
 UID  : {self.uid}\n\
 Email: {self.email}\n\
@@ -95,6 +96,10 @@ group Dispenser(a: string, b: string) {
 }
 Despenser@User -> {name, email}
 
+group Dispenser_2: User {
+    self.name  -> Name;
+    self.email -> Email;
+}
 
 fn main(args: vec<string>) -> int {
     admin = User::new(

@@ -12,6 +12,7 @@ use chumsky::extra;
 use chumsky::input::{Input, Stream, ValueInput};
 use chumsky::pratt;
 use chumsky::prelude::{choice, end, just, recursive};
+use crate::lexer::byte_to_line_col;
 
 type WindRichErr<'a> = extra::Err<Rich<'a, WindToken, WindSpan>>;
 
@@ -1299,7 +1300,7 @@ impl WindParser {
                             })
                             .collect();
                         let (line, col) =
-                            crate::modules::types::tokens::byte_to_line_col(source, span.start);
+                            byte_to_line_col(source, span.start);
                         let msg = format!(
                             "语法错误 #{i} [{}:{}]: 发现 {}, 期望 {}",
                             line,

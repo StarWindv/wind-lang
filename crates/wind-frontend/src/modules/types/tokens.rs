@@ -4,13 +4,7 @@ pub type WindSpan = std::ops::Range<usize>;
 
 pub type WindSpannedToken = (WindToken, WindSpan);
 
-pub fn byte_to_line_col(source: &str, offset: usize) -> (usize, usize) {
-    let offset = offset.min(source.len());
-    let line = source[..offset].matches('\n').count() + 1;
-    let last_nl = source[..offset].rfind('\n').map(|p| p + 1).unwrap_or(0);
-    let col = offset - last_nl + 1;
-    (line, col)
-}
+
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Hash)]
 #[logos(

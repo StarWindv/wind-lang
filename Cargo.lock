@@ -977,15 +977,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wind-test"
-version = "0.0.1"
-dependencies = [
- "log",
- "log4rs",
- "wind-frontend",
-]
-
-[[package]]
 name = "windows-core"
 version = "0.62.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

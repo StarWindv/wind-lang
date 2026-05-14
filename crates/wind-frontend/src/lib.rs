@@ -2,7 +2,8 @@ mod modules;
 
 pub mod lexer {
     use crate::modules;
-    pub use modules::types::tokens::{WindSpan, WindSpannedToken, WindToken, byte_to_line_col};
+    pub use modules::types::tokens::{WindSpan, WindSpannedToken, WindToken};
+    pub use modules::implements::byte_to_line_col;
 }
 
 pub mod parser {
