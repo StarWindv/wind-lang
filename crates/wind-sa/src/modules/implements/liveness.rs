@@ -1,6 +1,5 @@
-use super::gather::GatherContext;
+use super::super::types::GatherContext;
 use crate::modules::types::*;
-use crate::modules::types::types::*;
 use log::debug;
 
 pub struct LivenessAnalyzer {

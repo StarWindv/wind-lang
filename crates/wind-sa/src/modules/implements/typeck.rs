@@ -1,8 +1,7 @@
-use super::gather::GatherContext;
-use crate::modules::types::types::*;
+use super::super::types::GatherContext;
+use crate::modules::types::*;
 use wind_frontend::ast_node::*;
 use log::debug;
-use crate::modules::types::*;
 
 pub struct TypeChecker {
     pub errors: Vec<SemanticError>,

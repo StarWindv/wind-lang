@@ -1,8 +1,7 @@
 use log::debug;
 use wind_frontend::ast_node::*;
 use crate::modules::types::*;
-use crate::modules::types::types::*;
-use super::gather::GatherContext;
+use super::super::types::GatherContext;
 
 pub struct ConstraintChecker {
     pub errors: Vec<SemanticError>,
