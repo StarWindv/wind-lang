@@ -1,14 +1,7 @@
 use log::debug;
 use wind_frontend::ast_node::*;
 use crate::modules::types::*;
-use super::super::types::GatherContext;
-
-pub struct ConstraintChecker {
-    pub errors: Vec<SemanticError>,
-    has_main: bool,
-    source: Option<String>,
-    cursor: usize,
-}
+use crate::modules::types::{ConstraintChecker, GatherContext};
 
 impl ConstraintChecker {
     pub fn new() -> Self {

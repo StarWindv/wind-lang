@@ -4,12 +4,7 @@ pub use modules::types::*;
 use std::io::Write;
 use codespan_reporting::diagnostic::{Diagnostic, Label, LabelStyle};
 use codespan_reporting::files::SimpleFiles;
-use modules::implements::constraint_checker::ConstraintChecker;
-
 use wind_frontend::ast_node::WindProgram;
-use crate::modules::implements::liveness::LivenessAnalyzer;
-use crate::modules::implements::resolve::Resolver;
-use crate::modules::implements::typeck::TypeChecker;
 
 #[cfg(windows)]
 fn enable_ansi_colors() {

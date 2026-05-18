@@ -1,15 +1,7 @@
-use super::super::types::GatherContext;
 use crate::modules::types::*;
+use crate::modules::types::{GatherContext, Resolver};
 use wind_frontend::ast_node::*;
 use log::debug;
-
-pub struct Resolver {
-    pub errors: Vec<SemanticError>,
-    current_fn_name: String,
-    current_fn_scope_id: WindScopeId,
-    current_subscope_counter: u64,
-    source: Option<String>,
-}
 
 impl Resolver {
     pub fn new() -> Self {

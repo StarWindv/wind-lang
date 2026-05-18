@@ -1,12 +1,7 @@
-use super::super::types::GatherContext;
 use crate::modules::types::*;
+use crate::modules::types::{GatherContext, TypeChecker};
 use wind_frontend::ast_node::*;
 use log::debug;
-
-pub struct TypeChecker {
-    pub errors: Vec<SemanticError>,
-    current_fn_return_type: Option<WindResolvedType>,
-}
 
 impl TypeChecker {
     pub fn new() -> Self {

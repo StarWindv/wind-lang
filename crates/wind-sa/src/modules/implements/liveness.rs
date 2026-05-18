@@ -1,11 +1,6 @@
-use super::super::types::GatherContext;
 use crate::modules::types::*;
+use crate::modules::types::{GatherContext, LivenessAnalyzer};
 use log::debug;
-
-pub struct LivenessAnalyzer {
-    pub live_ranges: Vec<LiveRange>,
-    pub drop_points: Vec<DropPoint>,
-}
 
 impl LivenessAnalyzer {
     pub fn new() -> Self {
