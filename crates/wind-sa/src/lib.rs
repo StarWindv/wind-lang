@@ -1,23 +1,25 @@
 mod modules;
 
+pub use modules::types::types::*;
 pub use modules::types::*;
 use std::io::Write;
 use codespan_reporting::diagnostic::{Diagnostic, Label, LabelStyle};
 use codespan_reporting::files::SimpleFiles;
-use modules::implements::constraints::ConstraintChecker;
+use modules::implements::constraint_checker::ConstraintChecker;
 use modules::implements::gather::GatherContext;
 use modules::implements::liveness::LivenessAnalyzer;
 use modules::implements::resolve::Resolver;
 use modules::implements::typeck::TypeChecker;
 use wind_frontend::ast_node::WindProgram;
 
+
 #[cfg(windows)]
 fn enable_ansi_colors() {
     unsafe {
         unsafe extern "system" {
-            fn GetStdHandle(nStdHandle: u32) -> isize;
-            fn GetConsoleMode(hConsoleHandle: isize, lpMode: *mut u32) -> i32;
-            fn SetConsoleMode(hConsoleHandle: isize, dwMode: u32) -> i32;
+            fn GetStdHandle(n_std_handle: u32) -> isize;
+            fn GetConsoleMode(h_console_handle: isize, lp_mode: *mut u32) -> i32;
+            fn SetConsoleMode(h_console_handle: isize, dw_mode: u32) -> i32;
         }
         const STD_ERROR_HANDLE: u32 = u32::MAX - 11;
         const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
@@ -30,9 +32,6 @@ fn enable_ansi_colors() {
         }
     }
 }
-
-#[cfg(not(windows))]
-fn enable_ansi_colors() {}
 
 pub struct SemanticAnalyzer {
     pub ctx: GatherContext,
@@ -69,11 +68,11 @@ impl SemanticAnalyzer {
     }
 
     pub fn analyze(mut self, program: &WindProgram) -> Self {
-        log::info!("=== Semantic Analysis: Phase 1 - Symbol Gathering ===");
+        log::debug!("=== Semantic Analysis: Phase 1 - Symbol Gathering ===");
         self.ctx.gather(program);
         self.all_errors.extend(self.ctx.errors.drain(..));
 
-        log::info!("=== Semantic Analysis: Phase 2 - Name Resolution ===");
+        log::debug!("=== Semantic Analysis: Phase 2 - Name Resolution ===");
         let mut resolver = Resolver::new();
         if let Some(ref src) = self.source {
             resolver = resolver.with_source(src.clone());
@@ -81,12 +80,12 @@ impl SemanticAnalyzer {
         resolver.resolve(&mut self.ctx, program);
         self.all_errors.extend(resolver.errors);
 
-        log::info!("=== Semantic Analysis: Phase 3 - Type Checking ===");
+        log::debug!("=== Semantic Analysis: Phase 3 - Type Checking ===");
         let mut typeck = TypeChecker::new();
         typeck.check(&mut self.ctx, program);
         self.all_errors.extend(typeck.errors);
 
-        log::info!("=== Semantic Analysis: Phase 4 - Semantic Constraints ===");
+        log::debug!("=== Semantic Analysis: Phase 4 - Semantic Constraints ===");
         let mut constraint = ConstraintChecker::new();
         if let Some(ref src) = self.source {
             constraint = constraint.with_source(src.clone());
@@ -94,7 +93,7 @@ impl SemanticAnalyzer {
         constraint.check(&self.ctx, program);
         self.all_errors.extend(constraint.errors);
 
-        log::info!("=== Semantic Analysis: Phase 5 - Liveness Analysis ===");
+        log::debug!("=== Semantic Analysis: Phase 5 - Liveness Analysis ===");
         let mut liveness = LivenessAnalyzer::new();
         liveness.analyze(&mut self.ctx);
         self.live_ranges = liveness.live_ranges;
@@ -103,7 +102,7 @@ impl SemanticAnalyzer {
         if !self.all_errors.is_empty() {
             log::warn!("Semantic analysis completed with {} errors.", self.all_errors.len());
         } else {
-            log::info!("Semantic analysis completed successfully.");
+            log::debug!("Semantic analysis completed successfully.");
         }
 
         self

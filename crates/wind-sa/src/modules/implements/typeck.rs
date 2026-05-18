@@ -1,7 +1,8 @@
 use super::gather::GatherContext;
-use crate::modules::types::*;
+use crate::modules::types::types::*;
 use wind_frontend::ast_node::*;
-use log::info;
+use log::debug;
+use crate::modules::types::*;
 
 pub struct TypeChecker {
     pub errors: Vec<SemanticError>,
@@ -17,7 +18,7 @@ impl TypeChecker {
     }
 
     pub fn check(&mut self, ctx: &mut GatherContext, program: &WindProgram) {
-        info!("[TypeCheck] Starting type checking pass");
+        debug!("[TypeCheck] Starting type checking pass");
 
         for stmt in &program.items.clone() {
             self.check_stmt(ctx, stmt);

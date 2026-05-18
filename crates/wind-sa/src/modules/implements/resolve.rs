@@ -1,12 +1,13 @@
 use super::gather::GatherContext;
 use crate::modules::types::*;
+use crate::modules::types::types::*;
 use wind_frontend::ast_node::*;
-use log::info;
+use log::debug;
 
 pub struct Resolver {
     pub errors: Vec<SemanticError>,
     current_fn_name: String,
-    current_fn_scope_id: ScopeId,
+    current_fn_scope_id: WindScopeId,
     current_subscope_counter: u64,
     source: Option<String>,
 }
@@ -16,7 +17,7 @@ impl Resolver {
         Self {
             errors: Vec::new(),
             current_fn_name: String::new(),
-            current_fn_scope_id: ScopeId::new(1),
+            current_fn_scope_id: WindScopeId::new(1),
             current_subscope_counter: 0,
             source: None,
         }
@@ -40,10 +41,19 @@ impl Resolver {
     }
 
     pub fn resolve(&mut self, ctx: &mut GatherContext, program: &WindProgram) {
-        info!("[Resolve] Starting name resolution pass");
+        debug!("[Resolve] Starting name resolution pass");
 
         for stmt in &program.items.clone() {
             self.resolve_stmt(ctx, &stmt);
+        }
+    }
+
+    fn track_bind(&mut self, ctx: &mut GatherContext, name: MangledName, value: WindValueID) {
+        ctx.value_names
+            .entry(value)
+            .or_insert_with(|| name.var_name.clone());
+        if let Some(dead) = ctx.bindings.bind(name.clone(), value, &mut ctx.value_pool) {
+            ctx.dead_values.push((name, dead));
         }
     }
 
@@ -126,7 +136,7 @@ impl Resolver {
         ctx.scope_tree
             .current_scope_mut()
             .add_mangled_name(mangled.clone());
-        ctx.bindings.bind(mangled, value_id, &mut ctx.value_pool);
+        self.track_bind(ctx, mangled, value_id);
     }
 
     fn resolve_assignment(
@@ -214,7 +224,7 @@ impl Resolver {
         }
     }
 
-    fn resolve_expr_for_value(&mut self, ctx: &mut GatherContext, expr: &WindExpr) -> ValueId {
+    fn resolve_expr_for_value(&mut self, ctx: &mut GatherContext, expr: &WindExpr) -> WindValueID {
         match expr {
             WindExpr::IntLiteral(n) => ctx.value_pool.scalar(&n.to_string(), Some(WindResolvedType::Int)),
             WindExpr::FloatLiteral(f) => ctx.value_pool.scalar(&f.to_string(), Some(WindResolvedType::Float)),
@@ -308,7 +318,7 @@ impl Resolver {
         }
     }
 
-    fn resolve_identifier(&mut self, ctx: &mut GatherContext, name: &str) -> ValueId {
+    fn resolve_identifier(&mut self, ctx: &mut GatherContext, name: &str) -> WindValueID {
         match name {
             "self" | "this" | "it" => {
                 let mangled = MangledName::new(
@@ -389,8 +399,10 @@ impl Resolver {
             .map(|s| s.local_mangled_names.clone())
             .unwrap_or_default();
 
-        ctx.bindings
+        let dead = ctx
+            .bindings
             .unbind_all_in_scope(&mangled_names, &mut ctx.value_pool);
+        ctx.dead_values.extend(dead);
         ctx.scope_tree.pop_scope();
         self.current_subscope_counter = saved_sub;
     }
@@ -446,8 +458,10 @@ impl Resolver {
             .get_scope(scope_id)
             .map(|s| s.local_mangled_names.clone())
             .unwrap_or_default();
-        ctx.bindings
+        let dead = ctx
+            .bindings
             .unbind_all_in_scope(&mangled_names, &mut ctx.value_pool);
+        ctx.dead_values.extend(dead);
         ctx.scope_tree.pop_scope();
         self.current_subscope_counter = saved_sub;
     }
@@ -470,7 +484,7 @@ impl Resolver {
         );
 
         let vid = ctx.value_pool.new_allocated(None);
-        ctx.bindings.bind(mangled.clone(), vid, &mut ctx.value_pool);
+        self.track_bind(ctx, mangled.clone(), vid);
 
         ctx.scope_tree.insert_symbol(
             var,
@@ -526,7 +540,7 @@ impl Resolver {
             let mangled = MangledName::new(scope_id, name, 0, &param.name, 1);
 
             let vid = ctx.value_pool.new_allocated(None);
-            ctx.bindings.bind(mangled.clone(), vid, &mut ctx.value_pool);
+            self.track_bind(ctx, mangled.clone(), vid);
 
             let type_ref = param.ty.as_ref().map(WindTypeRef::from_ast);
 
@@ -552,8 +566,10 @@ impl Resolver {
             .get_scope(scope_id)
             .map(|s| s.local_mangled_names.clone())
             .unwrap_or_default();
-        ctx.bindings
+        let dead = ctx
+            .bindings
             .unbind_all_in_scope(&mangled_names, &mut ctx.value_pool);
+        ctx.dead_values.extend(dead);
         ctx.scope_tree.pop_scope();
 
         self.current_fn_name = saved_fn_name;
@@ -568,9 +584,9 @@ impl Resolver {
         name: &str,
         body: &[WindStmt],
     ) {
-        let mangled = MangledName::new(ScopeId::new(1), "global", 1, name, 1);
+        let mangled = MangledName::new(WindScopeId::new(1), "global", 1, name, 1);
         let vid = ctx.value_pool.new_allocated(Some(WindResolvedType::Tag));
-        ctx.bindings.bind(mangled, vid, &mut ctx.value_pool);
+        self.track_bind(ctx, mangled, vid);
 
         let scope_id = ctx.scope_tree.push_scope(ScopeKind::Block);
         let saved_fn = self.current_fn_name.clone();
@@ -610,7 +626,7 @@ impl Resolver {
                 Some(target),
             );
         }
-        info!(
+        debug!(
             "[Resolve] Apply: @{} -> {} with fields: {:?}",
             group, target, fields
         );

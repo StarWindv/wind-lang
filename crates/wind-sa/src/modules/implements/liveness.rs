@@ -1,6 +1,7 @@
 use super::gather::GatherContext;
 use crate::modules::types::*;
-use log::info;
+use crate::modules::types::types::*;
+use log::debug;
 
 pub struct LivenessAnalyzer {
     pub live_ranges: Vec<LiveRange>,
@@ -15,64 +16,102 @@ impl LivenessAnalyzer {
         }
     }
 
-    pub fn analyze(&mut self, ctx: &mut GatherContext) {
-        info!("[Liveness] Starting liveness analysis");
+    pub fn analyze(&mut self, ctx: &GatherContext) {
+        debug!("[Liveness] Starting liveness analysis");
 
         let mut position = 0usize;
+        let mut seen_dead: std::collections::HashSet<WindValueID> = std::collections::HashSet::new();
+
+        for (_name, value_id) in &ctx.dead_values {
+            let desc = self.describe_value(ctx, *value_id);
+            seen_dead.insert(*value_id);
+
+            if !self.drop_points.iter().any(|dp| dp.value == *value_id) {
+                self.drop_points.push(DropPoint {
+                    value: *value_id,
+                    description: desc.clone(),
+                    at_position: position,
+                });
+                position += 1;
+            }
+
+            if !self.live_ranges.iter().any(|lr| lr.value == *value_id) {
+                self.live_ranges.push(LiveRange {
+                    value: *value_id,
+                    description: desc,
+                    born_at: position,
+                    last_use: position,
+                    drop_at: Some(position),
+                    dropped_by_scope_exit: true,
+                });
+            }
+        }
+
+        let dead_count = seen_dead.len();
 
         for (value_id, value_info) in &ctx.value_pool.values {
-            let names = ctx.bindings.get_names_for_value(*value_id);
-            let last_use = names.len() as usize;
-
+            if seen_dead.contains(value_id) {
+                continue;
+            }
+            let desc = self.describe_value(ctx, *value_id);
             let live_range = LiveRange {
                 value: *value_id,
+                description: desc.clone(),
                 born_at: position,
-                last_use: position + last_use,
+                last_use: position,
                 drop_at: None,
                 dropped_by_scope_exit: false,
             };
 
-            if value_info.ref_count == 0 {
-                let drop_point = DropPoint {
-                    value: *value_id,
-                    at_position: position + last_use + 1,
-                };
-                self.drop_points.push(drop_point);
-            }
-
             self.live_ranges.push(live_range);
             position += 1;
+
+            if value_info.ref_count == 0
+                && !matches!(value_info.kind, ValueKind::Reference { .. })
+            {
+                self.drop_points.push(DropPoint {
+                    value: *value_id,
+                    description: desc,
+                    at_position: position,
+                });
+            }
         }
 
-        self.mark_scope_exit_drops(ctx);
-
-        info!(
-            "[Liveness] Found {} live ranges, {} drop points",
+        debug!(
+            "[Liveness] {} live ranges, {} drop points ({} from scope exit)",
             self.live_ranges.len(),
-            self.drop_points.len()
+            self.drop_points.len(),
+            dead_count,
         );
     }
 
-    fn mark_scope_exit_drops(&mut self, ctx: &GatherContext) {
-        for scope in ctx.scope_tree.scopes.values() {
-            let scope_exit_pos = self.live_ranges.len();
-
-            for mangled_name in &scope.local_mangled_names {
-                if let Some(&value_id) = ctx.bindings.name_to_value.get(mangled_name) {
-                    if let Some(info) = ctx.value_pool.get(value_id) {
-                        if info.ref_count <= 1 {
-                            let drop_point = DropPoint {
-                                value: value_id,
-                                at_position: scope_exit_pos,
-                            };
-
-                            if !self.drop_points.iter().any(|dp| dp.value == value_id) {
-                                self.drop_points.push(drop_point);
-                            }
-                        }
-                    }
-                }
+    fn describe_value(&self, ctx: &GatherContext, value_id: WindValueID) -> String {
+        if let Some(name) = ctx.value_names.get(&value_id) {
+            if let Some(info) = ctx.value_pool.get(value_id) {
+                return format!("'{}' {:?} (id:{})", name, info.kind, value_id.get());
             }
+            return format!("'{}' (id:{})", name, value_id.get());
         }
+        let names = ctx.bindings.get_names_for_value(value_id);
+        if !names.is_empty() {
+            let name_str: Vec<String> = names.iter().map(|n| n.var_name.clone()).collect();
+            if let Some(info) = ctx.value_pool.get(value_id) {
+                return format!(
+                    "'{}' {:?} (id:{})",
+                    name_str.join(", "),
+                    info.kind,
+                    value_id.get()
+                );
+            }
+            return format!("'{}' (id:{})", name_str.join(", "), value_id.get());
+        }
+        if let Some(info) = ctx.value_pool.get(value_id) {
+            return format!(
+                "{:?} (id:{})",
+                info.kind,
+                value_id.get()
+            );
+        }
+        format!("<unknown> (id:{})", value_id.get())
     }
 }

@@ -1,7 +1,7 @@
-use crate::modules::types::*;
-use log::info;
+use log::debug;
 use wind_frontend::ast_node::*;
-
+use crate::modules::types::*;
+use crate::modules::types::types::*;
 use super::gather::GatherContext;
 
 pub struct ConstraintChecker {
@@ -27,7 +27,7 @@ impl ConstraintChecker {
     }
 
     pub fn check(&mut self, ctx: &GatherContext, program: &WindProgram) {
-        info!("[Constraints] Starting semantic constraints pass");
+        debug!("[Constraints] Starting semantic constraints pass");
 
         for stmt in &program.items {
             self.check_top_level_stmt(ctx, stmt);

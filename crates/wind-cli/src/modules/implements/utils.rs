@@ -119,18 +119,134 @@ impl Utils {
 
         if result.has_errors() {
             result.emit_diagnostics();
-            log::info!(
-                "存活分析: {} 个存活区间, {} 个 Drop 点位",
-                result.live_ranges.len(),
-                result.drop_points.len()
-            );
+            log::info!("语义分析未通过. {} 个错误", result.all_errors.len());
         } else {
             log::info!("语义分析通过.");
-            log::info!(
-                "存活分析: {} 个存活区间, {} 个 Drop 点位",
-                result.live_ranges.len(),
-                result.drop_points.len()
-            );
+        }
+
+        debug_summary(&result);
+    }
+}
+
+fn debug_summary(_result: &SemanticAnalyzer) {
+    print_symbol_table(_result);
+    print_value_pool(_result);
+    print_liveness(_result);
+}
+
+fn print_symbol_table(result: &SemanticAnalyzer) {
+    use log::{debug, info};
+    let scopes = &result.ctx.scope_tree.scopes;
+
+    let sym_count: usize = scopes.values().map(|s| s.symbols.len()).sum();
+    info!("符号表: {} 个作用域, {} 个符号", scopes.len(), sym_count);
+
+    let mut scope_ids: Vec<_> = scopes.keys().collect();
+    scope_ids.sort_by_key(|k| k.get());
+
+    for sid in scope_ids {
+        let scope = &scopes[sid];
+        let kind = match scope.kind {
+            wind_sa::ScopeKind::Global => "Global",
+            wind_sa::ScopeKind::Function => "Function",
+            wind_sa::ScopeKind::Block => "Block",
+        };
+        if scope.symbols.is_empty() {
+            continue;
+        }
+        debug!(
+            "  [{} scope_id={}] {} 个符号:",
+            kind,
+            sid.get(),
+            scope.symbols.len()
+        );
+        for (name, sym) in &scope.symbols {
+            let sym_kind = match sym {
+                wind_sa::Symbol::Variable { storage_class, .. } => {
+                    format!("var ({:?})", storage_class)
+                }
+                wind_sa::Symbol::Function { .. } => "fn".to_string(),
+                wind_sa::Symbol::Struct { .. } => "struct".to_string(),
+                wind_sa::Symbol::Trait { .. } => "trait".to_string(),
+                wind_sa::Symbol::Enum { .. } => "enum".to_string(),
+                wind_sa::Symbol::TypeAlias { .. } => "type".to_string(),
+                wind_sa::Symbol::Extra { .. } => "extra".to_string(),
+                wind_sa::Symbol::Impl { .. } => "impl".to_string(),
+                wind_sa::Symbol::Group { .. } => "group".to_string(),
+            };
+            debug!("    - {} ({})", name, sym_kind);
+        }
+    }
+}
+
+fn print_value_pool(result: &SemanticAnalyzer) {
+    use log::debug;
+    let pool = &result.ctx.value_pool;
+    debug!("Value Pool: {} 个值", pool.values.len());
+    for (id, info) in &pool.values {
+        let name = result
+            .ctx
+            .value_names
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| "<anon>".to_string());
+        let kind = format!("{:?}", info.kind);
+        let ty = info
+            .ty
+            .as_ref()
+            .map(|t| t.display_name())
+            .unwrap_or_else(|| "?".to_string());
+        debug!(
+            "  - id={} '{}' {} ::{}  refs={}",
+            id.get(),
+            name,
+            kind,
+            ty,
+            info.ref_count,
+        );
+    }
+}
+
+fn print_liveness(result: &SemanticAnalyzer) {
+    use log::{debug, info};
+    let drops = &result.drop_points;
+    let ranges = &result.live_ranges;
+
+    let scope_drops: Vec<_> = drops
+        .iter()
+        .filter(|d| {
+            ranges
+                .iter()
+                .any(|r| r.value == d.value && r.dropped_by_scope_exit)
+        })
+        .collect();
+    let early_drops: Vec<_> = drops
+        .iter()
+        .filter(|d| {
+            !ranges
+                .iter()
+                .any(|r| r.value == d.value && r.dropped_by_scope_exit)
+        })
+        .collect();
+
+    info!(
+        "存活分析: {} 区间, {} Drop ({} scope-exit, {} early)",
+        ranges.len(),
+        drops.len(),
+        scope_drops.len(),
+        early_drops.len(),
+    );
+
+    if !early_drops.is_empty() {
+        debug!("  [提前 Drop (ref_count→0)]:");
+        for dp in &early_drops {
+            debug!("    - {}", dp.description);
+        }
+    }
+    if !scope_drops.is_empty() {
+        debug!("  [作用域退出 Drop]:");
+        for dp in &scope_drops {
+            debug!("    - {}", dp.description);
         }
     }
 }

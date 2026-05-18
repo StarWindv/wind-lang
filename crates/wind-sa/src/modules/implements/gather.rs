@@ -1,26 +1,31 @@
 use crate::modules::types::*;
+use crate::modules::types::types::*;
 use wind_frontend::ast_node::*;
-use log::info;
+use log::debug;
 
 pub struct GatherContext {
     pub scope_tree: ScopeTree,
-    pub value_pool: ValuePool,
+    pub value_pool: WindValuePool,
     pub bindings: Bindings,
     pub errors: Vec<SemanticError>,
+    pub dead_values: Vec<(MangledName, WindValueID)>,
+    pub value_names: std::collections::HashMap<WindValueID, String>,
 }
 
 impl GatherContext {
     pub fn new() -> Self {
         Self {
             scope_tree: ScopeTree::new(),
-            value_pool: ValuePool::new(),
+            value_pool: WindValuePool::new(),
             bindings: Bindings::new(),
             errors: Vec::new(),
+            dead_values: Vec::new(),
+            value_names: std::collections::HashMap::new(),
         }
     }
 
     pub fn gather(&mut self, program: &WindProgram) {
-        info!("[Gather] Starting symbol gathering pass");
+        debug!("[Gather] Starting symbol gathering pass");
 
         for stmt in &program.items {
             self.gather_top_level(stmt);
@@ -102,7 +107,7 @@ impl GatherContext {
                 target,
                 fields: _,
             } => {
-                info!("[Gather] Apply: @{} -> {}", group, target);
+                debug!("[Gather] Apply: @{} -> {}", group, target);
             }
 
             WindStmt::Expr(expr) => {
@@ -126,7 +131,7 @@ impl GatherContext {
         which: &Option<Vec<WindWhichClause>>,
     ) {
         let signature = FnSignatureInfo {
-            id: FnSignatureId::new(1),
+            id: WindFnSignatureId::new(1),
             public,
             name: name.to_string(),
             params: params
@@ -184,7 +189,7 @@ impl GatherContext {
             fields: field_infos,
         };
 
-        info!("[Gather] Struct: {}", name);
+        debug!("[Gather] Struct: {}", name);
         self.scope_tree.insert_symbol(name, symbol);
     }
 
@@ -207,7 +212,7 @@ impl GatherContext {
             variants: variant_list,
         };
 
-        info!("[Gather] Enum: {}", name);
+        debug!("[Gather] Enum: {}", name);
         self.scope_tree.insert_symbol(name, symbol);
     }
 
@@ -225,7 +230,7 @@ impl GatherContext {
             conditions: conditions.iter().map(|_| WindExprRef).collect(),
         };
 
-        info!("[Gather] TypeAlias: {}", name);
+        debug!("[Gather] TypeAlias: {}", name);
         self.scope_tree.insert_symbol(name, symbol);
     }
 
@@ -238,7 +243,7 @@ impl GatherContext {
         let mut method_ids = Vec::new();
         for sig in functions {
             let info = FnSignatureInfo {
-                id: FnSignatureId::new(1),
+                id: WindFnSignatureId::new(1),
                 public: sig.public,
                 name: sig.name.clone(),
                 params: sig
@@ -261,7 +266,7 @@ impl GatherContext {
             methods: method_ids,
         };
 
-        info!("[Gather] Trait: {}", name);
+        debug!("[Gather] Trait: {}", name);
         self.scope_tree.insert_symbol(name, symbol);
     }
 
@@ -276,9 +281,9 @@ impl GatherContext {
 
         for stmt in functions {
             if let WindStmt::FnDef { name, .. } = stmt {
-                let sig_id = FnSignatureId::new(1);
+                let sig_id = WindFnSignatureId::new(1);
                 fn_ids.push(sig_id);
-                info!("[Gather] Extra fn: {}", name);
+                debug!("[Gather] Extra fn: {}", name);
             }
         }
 
@@ -290,7 +295,7 @@ impl GatherContext {
 
         let key = extra_name.as_deref().unwrap_or(target);
         self.scope_tree.insert_symbol(key, symbol);
-        info!(
+        debug!(
             "[Gather] Extra for {} (public: {})",
             target, public
         );
@@ -307,9 +312,9 @@ impl GatherContext {
 
         for stmt in functions {
             if let WindStmt::FnDef { name, .. } = stmt {
-                let sig_id = FnSignatureId::new(1);
+                let sig_id = WindFnSignatureId::new(1);
                 fn_ids.push(sig_id);
-                info!("[Gather] Impl fn: {}", name);
+                debug!("[Gather] Impl fn: {}", name);
             }
         }
 
@@ -321,7 +326,7 @@ impl GatherContext {
 
         let key = format!("impl_{}_for_{}", trait_name, target);
         self.scope_tree.insert_symbol(&key, symbol);
-        info!(
+        debug!(
             "[Gather] Impl {} for {} (public: {})",
             trait_name, target, public
         );
@@ -359,13 +364,13 @@ impl GatherContext {
             rules: rule_infos,
         };
 
-        info!("[Gather] Group: {}", name);
+        debug!("[Gather] Group: {}", name);
         self.scope_tree.insert_symbol(name, symbol);
     }
 
     fn gather_var_def(&mut self, name: &str, ty: &WindType, storage: StorageClass) {
-        info!("[Gather] Variable: {} ({:?})", name, storage);
-        let mangled = MangledName::new(ScopeId::new(1), "global", 1, name, 1);
+        debug!("[Gather] Variable: {} ({:?})", name, storage);
+        let mangled = MangledName::new(WindScopeId::new(1), "global", 1, name, 1);
         let type_ref = WindTypeRef::from_ast(ty);
 
         let symbol = Symbol::Variable {
@@ -382,7 +387,7 @@ impl GatherContext {
     }
 
     fn gather_tag_expr(&mut self, name: &str, _body: &[WindStmt]) {
-        let mangled = MangledName::new(ScopeId::new(1), "global", 1, name, 1);
+        let mangled = MangledName::new(WindScopeId::new(1), "global", 1, name, 1);
 
         let symbol = Symbol::Variable {
             name: name.to_string(),
